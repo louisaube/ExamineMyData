@@ -13,6 +13,32 @@ Usage simple:
 
     generate_excel_report(comparison, "rapport_normalisation.xlsx")
 
+Validation des headers:
+    from gl_normalizer import validate_gl_headers
+
+    validation = validate_gl_headers("mon_gl.xlsx")
+    print(validation.summary())  # Affiche le mapping détecté et suggestions
+
+    if not validation.is_valid:
+        print(f"Colonnes manquantes: {validation.missing_required}")
+        print(f"Suggestions: {validation.suggestions}")
+
+Analyse analytique:
+    from gl_normalizer import GLLoader, PnLNormalizer
+
+    loader = GLLoader("GL_2025.xlsx")
+    df = loader.load()
+
+    # Voir les axes analytiques disponibles
+    print(loader.get_analytical_axes())
+
+    # Analyser par axe
+    normalizer = PnLNormalizer(df, 2025)
+    for axe in normalizer.get_available_axes():
+        breakdowns = normalizer.analyze_by_axe(axe)
+        for b in breakdowns[:5]:
+            print(f"{b.valeur}: {b.total_annuel:,.0f}€")
+
 Usage avancé:
     from gl_normalizer import GLComparator, GLLoader, PnLNormalizer
 
@@ -32,11 +58,17 @@ Usage avancé:
     print(drilldown.format_drilldown_report(analysis))
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "GL Normalizer Team"
 
 # API publique principale
-from .loader import GLLoader, load_gl, load_multiple_gl
+from .loader import (
+    GLLoader,
+    load_gl,
+    load_multiple_gl,
+    validate_gl_headers,
+    HeaderValidator,
+)
 from .classifier import GLClassifier, classify_gl
 from .pnl_normalizer import (
     PnLNormalizer,
@@ -44,6 +76,7 @@ from .pnl_normalizer import (
     NormalizedPLResult,
     ProvisionAnalysis,
     AnomalyDetection,
+    AnalyticalBreakdown,
 )
 from .comparator import GLComparator, compare_years, YearComparison
 from .drilldown import VariationDrilldown, AccountDrilldown, VariationBridge
@@ -53,7 +86,15 @@ from .reporter import (
     generate_excel_report,
     generate_text_report,
 )
-from .config import NormalizerConfig, EntryType
+from .config import (
+    NormalizerConfig,
+    EntryType,
+    HeaderValidation,
+    ColumnMapping,
+    REQUIRED_COLUMNS,
+    OPTIONAL_COLUMNS,
+    STANDARD_ANALYTICAL_COLUMNS,
+)
 
 # Exports publics
 __all__ = [
@@ -63,6 +104,8 @@ __all__ = [
     "GLLoader",
     "load_gl",
     "load_multiple_gl",
+    "validate_gl_headers",
+    "HeaderValidator",
     # Classifier
     "GLClassifier",
     "classify_gl",
@@ -72,6 +115,7 @@ __all__ = [
     "NormalizedPLResult",
     "ProvisionAnalysis",
     "AnomalyDetection",
+    "AnalyticalBreakdown",
     # Comparator
     "GLComparator",
     "compare_years",
@@ -88,4 +132,9 @@ __all__ = [
     # Config
     "NormalizerConfig",
     "EntryType",
+    "HeaderValidation",
+    "ColumnMapping",
+    "REQUIRED_COLUMNS",
+    "OPTIONAL_COLUMNS",
+    "STANDARD_ANALYTICAL_COLUMNS",
 ]

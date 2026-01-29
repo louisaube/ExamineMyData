@@ -11,7 +11,28 @@ import numpy as np
 from typing import Optional, Dict, List, Tuple, Union
 from dataclasses import dataclass, field
 
-from .config import NormalizerConfig, COMPTES_CHARGES
+from .config import NormalizerConfig, COMPTES_CHARGES, STANDARD_ANALYTICAL_COLUMNS
+
+
+@dataclass
+class AnalyticalBreakdown:
+    """Ventilation analytique d'un compte ou d'un ensemble"""
+
+    axe: str                      # Nom de l'axe (axe_1, axe_2, etc.)
+    valeur: str                   # Valeur de l'axe (code section, projet, etc.)
+    compte: Optional[str]         # Compte concerné (None si agrégé)
+    total_annuel: float
+    decembre_brut: float
+    run_rate_mensuel: float
+    ecart_decembre: float
+    pct_du_total: float           # % de cette section dans le total
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.axe}={self.valeur}: "
+            f"Total={self.total_annuel:,.0f}€, "
+            f"Déc={self.decembre_brut:,.0f}€ ({self.pct_du_total:.1f}%)"
+        )
 
 
 @dataclass
@@ -108,6 +129,9 @@ class NormalizedPLResult:
     # Détails
     provisions: List[ProvisionAnalysis] = field(default_factory=list)
     anomalies: List[AnomalyDetection] = field(default_factory=list)
+
+    # Ventilation analytique (si disponible)
+    analytique: Dict[str, List[AnalyticalBreakdown]] = field(default_factory=dict)
 
     # DataFrames pour analyse détaillée
     monthly_by_compte: pd.DataFrame = field(default=None, repr=False)
@@ -432,6 +456,200 @@ class PnLNormalizer:
     def _get_libelle_compte(self, compte: str) -> str:
         """Récupère le libellé d'un compte"""
         return self.compte_labels.get(compte, "")
+
+    def get_available_axes(self) -> List[str]:
+        """Retourne les axes analytiques disponibles dans les données"""
+        available = []
+        for axe in STANDARD_ANALYTICAL_COLUMNS:
+            if axe in self.df_pnl.columns and self.df_pnl[axe].notna().any():
+                available.append(axe)
+        return available
+
+    def analyze_by_axe(
+        self,
+        axe: str,
+        compte: Optional[str] = None,
+        classe: Optional[str] = "6"
+    ) -> List[AnalyticalBreakdown]:
+        """
+        Analyse la ventilation par axe analytique.
+
+        Args:
+            axe: Nom de l'axe (axe_1, axe_2, axe_3)
+            compte: Filtrer sur un compte spécifique (optionnel)
+            classe: Classe de compte à analyser (défaut: "6" = charges)
+
+        Returns:
+            Liste des ventilations par valeur d'axe
+        """
+        if axe not in self.df_pnl.columns:
+            return []
+
+        # Filtrer les données
+        df = self.df_pnl.copy()
+        if classe:
+            df = df[df["classe"] == classe]
+        if compte:
+            df = df[df["compte"] == compte]
+
+        # Ne garder que les lignes avec une valeur analytique
+        df = df[df[axe].notna()]
+
+        if df.empty:
+            return []
+
+        # Agréger par valeur d'axe et période
+        agg = df.groupby([axe, "periode"]).agg({
+            "montant_pnl": "sum"
+        }).reset_index()
+
+        # Pivot pour avoir les mois en colonnes
+        pivot = agg.pivot_table(
+            index=axe,
+            columns="periode",
+            values="montant_pnl",
+            aggfunc="sum",
+            fill_value=0
+        )
+
+        # Calculer les métriques
+        breakdowns = []
+        total_global = pivot.values.sum()
+
+        for valeur in pivot.index:
+            row = pivot.loc[valeur]
+            total_annuel = row.sum()
+            dec_brut = row.get(self.mois_decembre, 0)
+            run_rate = total_annuel / self.config.nb_mois
+            ecart = run_rate - dec_brut
+            pct = (total_annuel / total_global * 100) if total_global != 0 else 0
+
+            breakdowns.append(AnalyticalBreakdown(
+                axe=axe,
+                valeur=str(valeur),
+                compte=compte,
+                total_annuel=total_annuel,
+                decembre_brut=dec_brut,
+                run_rate_mensuel=run_rate,
+                ecart_decembre=ecart,
+                pct_du_total=pct,
+            ))
+
+        # Trier par total décroissant
+        breakdowns.sort(key=lambda x: abs(x.total_annuel), reverse=True)
+
+        return breakdowns
+
+    def get_analytical_summary(self) -> Dict[str, pd.DataFrame]:
+        """
+        Retourne un résumé de la ventilation analytique pour tous les axes.
+
+        Returns:
+            Dict avec un DataFrame par axe disponible
+        """
+        summary = {}
+
+        for axe in self.get_available_axes():
+            breakdowns = self.analyze_by_axe(axe)
+            if breakdowns:
+                data = [
+                    {
+                        "Valeur": b.valeur,
+                        "Total annuel": b.total_annuel,
+                        "Décembre brut": b.decembre_brut,
+                        "Run rate": b.run_rate_mensuel,
+                        "Écart déc": b.ecart_decembre,
+                        "% du total": b.pct_du_total,
+                    }
+                    for b in breakdowns
+                ]
+                summary[axe] = pd.DataFrame(data)
+
+        return summary
+
+    def analyze_provisions_by_axe(
+        self,
+        axe: str,
+        seuil_regul: Optional[float] = None
+    ) -> Dict[str, List[ProvisionAnalysis]]:
+        """
+        Analyse les provisions ventilées par axe analytique.
+
+        Args:
+            axe: Nom de l'axe analytique
+            seuil_regul: Seuil de régularisation
+
+        Returns:
+            Dict {valeur_axe: [provisions]}
+        """
+        if axe not in self.df_pnl.columns:
+            return {}
+
+        seuil = seuil_regul or self.config.seuil_regul
+        result = {}
+
+        # Obtenir les valeurs uniques de l'axe
+        valeurs = self.df_pnl[self.df_pnl[axe].notna()][axe].unique()
+
+        for valeur in valeurs:
+            # Filtrer sur cette valeur d'axe
+            df_filtered = self.df_pnl[self.df_pnl[axe] == valeur].copy()
+
+            if df_filtered.empty:
+                continue
+
+            # Agréger par compte et période
+            agg = df_filtered.groupby(["compte", "periode"]).agg({
+                "montant_pnl": "sum",
+                "libelle_compte": "first",
+            }).reset_index()
+
+            # Pivot
+            pivot = agg.pivot_table(
+                index="compte",
+                columns="periode",
+                values="montant_pnl",
+                aggfunc="sum",
+                fill_value=0
+            )
+
+            # Analyser chaque compte
+            provisions = []
+            for compte in pivot.index:
+                if not str(compte).startswith("6"):
+                    continue
+
+                row = pivot.loc[compte]
+                total_annuel = row.sum()
+                dec_value = row.get(self.mois_decembre, 0)
+
+                autres_mois = [m for m in row.index if m != self.mois_decembre]
+                moyenne_hors_dec = row[autres_mois].mean() if autres_mois else 0
+                ecart_vs_moyenne = dec_value - moyenne_hors_dec
+
+                if abs(ecart_vs_moyenne) < seuil:
+                    continue
+
+                run_rate = total_annuel / self.config.nb_mois
+                ecart_normalisation = run_rate - dec_value
+
+                provisions.append(ProvisionAnalysis(
+                    compte=compte,
+                    libelle_compte=self._get_libelle_compte(compte),
+                    total_annuel=total_annuel,
+                    run_rate_mensuel=run_rate,
+                    decembre_brut=dec_value,
+                    decembre_normalise=run_rate,
+                    ecart_decembre=ecart_normalisation,
+                    moyenne_hors_dec=moyenne_hors_dec,
+                    ecart_vs_moyenne=ecart_vs_moyenne,
+                ))
+
+            if provisions:
+                provisions.sort(key=lambda x: abs(x.ecart_decembre), reverse=True)
+                result[str(valeur)] = provisions
+
+        return result
 
 
 def normalize_pnl(
