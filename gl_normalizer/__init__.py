@@ -80,6 +80,13 @@ from .pnl_normalizer import (
 )
 from .comparator import GLComparator, compare_years, YearComparison
 from .drilldown import VariationDrilldown, AccountDrilldown, VariationBridge
+from .content_analyzer import (
+    ContentAnalyzer,
+    analyze_content,
+    JournalAnalysis,
+    ContentPattern,
+    AccountContent,
+)
 from .reporter import (
     ExcelReporter,
     TextReporter,
@@ -124,6 +131,12 @@ __all__ = [
     "VariationDrilldown",
     "AccountDrilldown",
     "VariationBridge",
+    # Content Analyzer
+    "ContentAnalyzer",
+    "analyze_content",
+    "JournalAnalysis",
+    "ContentPattern",
+    "AccountContent",
     # Reporter
     "ExcelReporter",
     "TextReporter",

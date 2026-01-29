@@ -424,10 +424,227 @@ def test_comparison_two_years():
     return comparison
 
 
+def test_content_analysis():
+    """Test de l'analyse de contenu (journaux OD, patterns, libellés)"""
+
+    print("\n" + "=" * 70)
+    print("TEST ANALYSE DE CONTENU")
+    print("=" * 70)
+
+    from gl_normalizer.content_analyzer import ContentAnalyzer
+
+    # Créer des données avec des patterns explicites
+    year = 2024
+    df = create_synthetic_gl(year)
+
+    # Ajouter des écritures avec patterns spécifiques
+    additional_records = [
+        # Régularisation avec libellé explicite
+        {
+            "date": datetime(year, 12, 31),
+            "compte": "615000",
+            "libelle_compte": "Entretien et réparations",
+            "journal": "OD",
+            "piece": "OD202412100",
+            "libelle": "REGUL provision entretien annuel",
+            "debit": 15000,
+            "credit": 0,
+            "axe_1": "PROD",
+        },
+        # FNP
+        {
+            "date": datetime(year, 12, 31),
+            "compte": "606000",
+            "libelle_compte": "Fournitures non stockables",
+            "journal": "OD",
+            "piece": "OD202412101",
+            "libelle": "FNP fournitures décembre",
+            "debit": 8000,
+            "credit": 0,
+            "axe_1": "ADMIN",
+        },
+        # Reprise de provision
+        {
+            "date": datetime(year, 12, 31),
+            "compte": "781000",
+            "libelle_compte": "Reprises sur provisions",
+            "journal": "OD",
+            "piece": "OD202412102",
+            "libelle": "Reprise provision client douteux",
+            "debit": 0,
+            "credit": 12000,
+            "axe_1": "COMMERCIAL",
+        },
+        # Écriture standard (journal AC)
+        {
+            "date": datetime(year, 6, 15),
+            "compte": "601000",
+            "libelle_compte": "Achats",
+            "journal": "AC",
+            "piece": "AC202406001",
+            "libelle": "Achats matières juin",
+            "debit": 5000,
+            "credit": 0,
+            "axe_1": "PROD",
+        },
+    ]
+
+    df_additional = pd.DataFrame(additional_records)
+    df_additional["date"] = pd.to_datetime(df_additional["date"])
+    df_additional["annee"] = df_additional["date"].dt.year
+    df_additional["mois"] = df_additional["date"].dt.month
+    df_additional["periode"] = df_additional["date"].dt.strftime("%Y-%m")
+    df_additional["classe"] = df_additional["compte"].str[0]
+    df_additional["racine_2"] = df_additional["compte"].str[:2]
+    df_additional["racine_3"] = df_additional["compte"].str[:3]
+    df_additional["montant"] = df_additional["debit"] - df_additional["credit"]
+
+    df = pd.concat([df, df_additional], ignore_index=True)
+
+    # Créer l'analyseur de contenu
+    analyzer = ContentAnalyzer(df, year)
+
+    # =========================================================================
+    # TEST 1: ANALYSE DES JOURNAUX
+    # =========================================================================
+    print(f"\n1. ANALYSE DES JOURNAUX")
+    print("-" * 50)
+
+    journals = analyzer.analyze_journals()
+
+    print(f"   Nb journaux: {len(journals)}")
+
+    journaux_od = [j for j in journals if j.is_od or j.is_situation]
+    print(f"   Journaux OD/Situation: {len(journaux_od)}")
+
+    for j in journals:
+        type_jal = "OD" if j.is_od else ("SIT" if j.is_situation else "STD")
+        print(f"\n   [{type_jal}] {j.journal}:")
+        print(f"     Écritures: {j.nb_ecritures}")
+        print(f"     Débit: {j.total_debit:,.0f}€")
+        print(f"     % en décembre: {j.pct_decembre:.0f}%")
+
+    # Vérifier que OD est détecté
+    od_journal = next((j for j in journals if j.journal == "OD"), None)
+    assert od_journal is not None, "Journal OD non trouvé!"
+    assert od_journal.is_od, "Journal OD non identifié comme OD!"
+    print(f"\n   ✓ Journal OD correctement identifié")
+
+    # =========================================================================
+    # TEST 2: DÉTECTION DES PATTERNS
+    # =========================================================================
+    print(f"\n2. DÉTECTION DES PATTERNS")
+    print("-" * 50)
+
+    patterns = analyzer.analyze_patterns()
+
+    print(f"   Nb patterns détectés: {len(patterns)}")
+
+    for p in patterns[:10]:
+        print(f"\n   [{p.category}] {p.pattern}:")
+        print(f"     Occurrences: {p.nb_occurrences}")
+        print(f"     Montant net: {p.montant_net:+,.0f}€")
+        print(f"     Exemples: {p.exemples_libelles[:2]}")
+
+    # Vérifier que REGUL est détecté
+    regul_patterns = [p for p in patterns if "REGUL" in p.pattern or p.category == "REGUL"]
+    assert len(regul_patterns) > 0, "Pattern REGUL non détecté!"
+    print(f"\n   ✓ Patterns REGUL correctement détectés")
+
+    # Vérifier FNP
+    fnp_patterns = [p for p in patterns if "FNP" in p.pattern]
+    assert len(fnp_patterns) > 0, "Pattern FNP non détecté!"
+    print(f"   ✓ Pattern FNP correctement détecté")
+
+    # Vérifier REPRISE
+    reprise_patterns = [p for p in patterns if "REPRISE" in p.pattern]
+    assert len(reprise_patterns) > 0, "Pattern REPRISE non détecté!"
+    print(f"   ✓ Pattern REPRISE correctement détecté")
+
+    # =========================================================================
+    # TEST 3: CONCENTRATION OD PAR MOIS
+    # =========================================================================
+    print(f"\n3. CONCENTRATION OD PAR MOIS")
+    print("-" * 50)
+
+    od_concentration = analyzer.get_od_concentration()
+
+    print(f"\n   Mois    Écritures    % OD")
+    print(f"   ----    ---------    ----")
+    for _, row in od_concentration.iterrows():
+        print(f"   {int(row['Mois']):2d}      {int(row['Total écritures']):5d}        {row['% OD']:5.1f}%")
+
+    # Vérifier concentration en décembre
+    dec_row = od_concentration[od_concentration["Mois"] == 12].iloc[0]
+    print(f"\n   % OD en décembre: {dec_row['% OD']:.1f}%")
+    assert dec_row["% OD"] > 50, "Les OD devraient être concentrés en décembre!"
+    print(f"   ✓ Concentration OD en décembre correctement détectée")
+
+    # =========================================================================
+    # TEST 4: ANALYSE CONTENU D'UN COMPTE
+    # =========================================================================
+    print(f"\n4. ANALYSE CONTENU COMPTE 631000")
+    print("-" * 50)
+
+    content = analyzer.analyze_account_content("631000")
+
+    if content:
+        print(f"\n   Compte: {content.compte} - {content.libelle_compte}")
+        print(f"   Écritures: {content.nb_ecritures}")
+        print(f"   Débit: {content.total_debit:,.0f}€")
+        print(f"   Crédit: {content.total_credit:,.0f}€")
+        print(f"   % OD: {content.pct_od:.1f}%")
+        print(f"   Régul heavy: {content.is_regul_heavy}")
+
+        print(f"\n   Répartition par journal:")
+        for jal, montant in content.par_journal.items():
+            print(f"     {jal}: {montant:,.0f}€")
+
+        print(f"\n   Libellés uniques:")
+        for lib in content.libelles_uniques[:5]:
+            print(f"     - {lib}")
+
+        assert content.pct_od == 100, "Le compte 631000 devrait être 100% OD!"
+        print(f"\n   ✓ Analyse de contenu correcte")
+
+    # =========================================================================
+    # TEST 5: RÉCUPÉRATION ÉCRITURES DE RÉGUL
+    # =========================================================================
+    print(f"\n5. ÉCRITURES DE RÉGULARISATION")
+    print("-" * 50)
+
+    df_regul = analyzer.get_regul_entries()
+
+    print(f"   Nb écritures de régul identifiées: {len(df_regul)}")
+
+    if not df_regul.empty:
+        print(f"\n   Top 5 par montant:")
+        for _, row in df_regul.head(5).iterrows():
+            print(f"     {row['compte']} | {row['journal']} | {row['montant']:+,.0f}€ | {row['libelle'][:40]}")
+
+    # =========================================================================
+    # RÉSUMÉ
+    # =========================================================================
+    print(f"\n" + "=" * 70)
+    print("RÉSUMÉ ANALYSE DE CONTENU")
+    print("=" * 70)
+
+    summary = analyzer.summary()
+    print(f"   Journaux: {summary['nb_journaux']} (dont {summary['nb_journaux_od']} OD)")
+    print(f"   Patterns régul: {summary['patterns_regul']} ({summary['montant_regul']:+,.0f}€)")
+    print(f"   Patterns except: {summary['patterns_except']} ({summary['montant_except']:+,.0f}€)")
+    print(f"   % OD décembre: {summary['pct_od_decembre']:.1f}%")
+
+    print(f"\n✓ TOUS LES TESTS D'ANALYSE DE CONTENU PASSÉS")
+
+    return analyzer
+
+
 if __name__ == "__main__":
     # Exécuter les tests
     result = test_methodology()
     comparison = test_comparison_two_years()
+    content = test_content_analysis()
 
     print("\n" + "=" * 70)
     print("FIN DES TESTS - MÉTHODOLOGIE VALIDÉE")
