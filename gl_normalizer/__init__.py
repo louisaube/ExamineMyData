@@ -112,6 +112,15 @@ from .config import (
     OPTIONAL_COLUMNS,
     STANDARD_ANALYTICAL_COLUMNS,
 )
+from .security import (
+    SecurityLimits,
+    SecurityError,
+    SecureFileStorage,
+    check_file_size,
+    check_dataframe_limits,
+    validate_file_extension,
+    get_limits_summary,
+)
 
 # Exports publics
 __all__ = [
@@ -169,6 +178,14 @@ __all__ = [
     "REQUIRED_COLUMNS",
     "OPTIONAL_COLUMNS",
     "STANDARD_ANALYTICAL_COLUMNS",
+    # Security
+    "SecurityLimits",
+    "SecurityError",
+    "SecureFileStorage",
+    "check_file_size",
+    "check_dataframe_limits",
+    "validate_file_extension",
+    "get_limits_summary",
     # AI Module
     "ai",
 ]

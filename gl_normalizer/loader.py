@@ -23,6 +23,14 @@ from typing import Optional, Union, List, Dict, Tuple
 from datetime import datetime
 from difflib import SequenceMatcher
 
+from .security import (
+    check_file_size,
+    check_dataframe_limits,
+    sanitize_dataframe,
+    SecurityLimits,
+    SecurityError,
+)
+
 logger = logging.getLogger(__name__)
 
 from .config import (
@@ -296,28 +304,45 @@ class GLLoader:
         return self.df
 
     def _read_file(self, sheet_name: Union[str, int] = 0) -> pd.DataFrame:
-        """Lit le fichier selon son extension"""
+        """Lit le fichier selon son extension avec contrôles de sécurité"""
         suffix = self.file_path.suffix.lower()
 
+        # Vérification taille fichier AVANT chargement
+        limits = SecurityLimits()
+        check_file_size(self.file_path, limits)
+
         if suffix in [".xlsx", ".xls", ".xlsm"]:
-            return pd.read_excel(self.file_path, sheet_name=sheet_name)
+            df = pd.read_excel(self.file_path, sheet_name=sheet_name, nrows=limits.max_rows)
         elif suffix == ".csv":
             # Tenter plusieurs encodages et séparateurs
+            df = None
             for encoding in ["utf-8", "latin-1", "cp1252"]:
                 for sep in [";", ",", "\t"]:
                     try:
                         df = pd.read_csv(
                             self.file_path,
                             encoding=encoding,
-                            sep=sep
+                            sep=sep,
+                            nrows=limits.max_rows
                         )
                         if len(df.columns) > 1:
-                            return df
+                            break
                     except Exception:
                         continue
-            raise ValueError(f"Impossible de lire le fichier CSV: {self.file_path}")
+                if df is not None and len(df.columns) > 1:
+                    break
+            if df is None or len(df.columns) <= 1:
+                raise ValueError(f"Impossible de lire le fichier CSV: {self.file_path}")
         else:
             raise ValueError(f"Format non supporté: {suffix}")
+
+        # Vérification limites DataFrame
+        check_dataframe_limits(df, limits, f"Fichier {self.file_path.name}")
+
+        # Sanitization
+        df = sanitize_dataframe(df, limits)
+
+        return df
 
     def _apply_validation_mapping(self) -> pd.DataFrame:
         """Applique le mapping issu de la validation"""
