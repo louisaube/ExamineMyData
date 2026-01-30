@@ -1,19 +1,46 @@
 # GL Normalizer
 
-Analyse et normalisation du P&L pour comparer deux périodes comptables en **neutralisant les artefacts comptables** (régularisations, provisions concentrées, charges one-shot) et obtenir le **run rate opérationnel réel**.
+**Traquer les provisions pour révéler le véritable Run Rate opérationnel.**
+
+Outil d'analyse du Grand Livre (GL) qui **dépollue le P&L** des artefacts comptables (provisions injustifiées, enveloppes gonflées/dégonflées) pour calculer le **run rate réel** de l'entreprise.
+
+## Prérequis
+
+> ⚠️ **Comptabilité mensuelle requise**
+>
+> Cet outil nécessite une comptabilité tenue mensuellement. L'analyse repose sur la comparaison des patterns mensuels pour détecter les anomalies de provisionnement.
 
 ## Problématique
 
-Le P&L de décembre est souvent pollué par :
+Les entreprises manipulent (consciemment ou non) leurs provisions :
 
-| Type | Exemple | Impact |
-|------|---------|--------|
-| Régularisations pluriannuelles | Dégrèvements TS 2022/2023/2024 | Gonfle/dégonfle artificiellement |
-| Dotations annuelles concentrées | IS, amortissements | Charge 12 mois sur 1 mois |
-| Provisions oubliées | FNP, charges à payer | Charges mal réparties |
-| Sur-provisionnement antérieur | Reprise de provisions | Allège artificiellement |
+| Pratique | Description | Effet sur le P&L |
+|----------|-------------|------------------|
+| **Enveloppes gonflées** | Provisions excessives par prudence ou pour lisser | Cache la vraie performance |
+| **Enveloppes dégonflées** | Sous-provisionnement pour améliorer le résultat | Embellit artificiellement |
+| **Provisions sans justification** | Maintien de provisions historiques jamais reprises | Réserve cachée |
+| **Concentrations fin d'année** | Toutes les dotations en décembre | Écrase un mois, fausse les autres |
+| **Reprises opportunistes** | Reprise de provisions au "bon moment" | Améliore artificiellement |
 
-**Résultat** : Une variation apparente de +556k€ peut être en réalité de -3k€.
+**L'objectif** : Exploiter la stabilité de la situation de fin d'année (quand tout est "tombé") pour calculer le véritable niveau de charges opérationnelles.
+
+## Principe de fonctionnement
+
+```
+P&L Comptable (pollué)
+        ↓
+    ANALYSE
+    - Détection des concentrations mensuelles anormales
+    - Identification des patterns de provisionnement
+    - Comparaison N vs N-1
+        ↓
+    DÉPOLLUTION
+    - Redistribution des provisions sur 12 mois
+    - Neutralisation des one-shots
+    - Calcul du run rate mensuel
+        ↓
+Run Rate Réel (dépollué)
+```
 
 ## Installation
 
@@ -21,10 +48,9 @@ Le P&L de décembre est souvent pollué par :
 pip install -r requirements.txt
 ```
 
-Ou avec pip editable :
-
+Dépendances optionnelles pour le module IA :
 ```bash
-pip install -e .
+pip install scikit-learn xgboost torch sentence-transformers
 ```
 
 ## Usage rapide
@@ -32,79 +58,72 @@ pip install -e .
 ```python
 from gl_normalizer import compare_years, generate_excel_report
 
-# Comparer deux années
+# Comparer deux années (nécessite comptabilité mensuelle)
 comparison = compare_years("GL_2024.xlsx", "GL_2025.xlsx")
 
-# Afficher les résultats
-print(f"Variation brute (comptable):  {comparison.variation_brute:>+12,.0f}€")
-print(f"Variation réelle (run rate): {comparison.variation_normalisee:>+12,.0f}€")
-print(f"Écart (artefacts):           {comparison.ecart_normalisation:>+12,.0f}€")
+# Résultats
+print(f"Variation comptable:  {comparison.variation_brute:>+12,.0f}€")
+print(f"Variation run rate:   {comparison.variation_normalisee:>+12,.0f}€")
+print(f"Impact provisions:    {comparison.ecart_normalisation:>+12,.0f}€")
 
-# Générer un rapport Excel
-generate_excel_report(comparison, "rapport_normalisation.xlsx")
+# Rapport Excel
+generate_excel_report(comparison, "analyse_provisions.xlsx")
 ```
 
-## Usage avancé
+## Fonctionnalités principales
 
-### Charger et classifier un GL
-
-```python
-from gl_normalizer import load_gl, classify_gl
-
-# Charger (détection automatique du format: Sage, Cegid, générique)
-df = load_gl("mon_gl.xlsx")
-
-# Classifier les écritures
-df_classified = classify_gl(df)
-```
-
-### Analyser les provisions
+### 1. Traquer les provisions suspectes
 
 ```python
 from gl_normalizer import PnLNormalizer
 
-normalizer = PnLNormalizer(df_classified, 2025)
+normalizer = PnLNormalizer(df, 2025)
 
-# Provisions avec impact significatif
+# Provisions avec comportement anormal
 provisions = normalizer.analyze_provisions()
 for p in provisions[:5]:
-    print(f"{p.compte}: Déc brut={p.decembre_brut:,.0f}€, Impact={p.ecart_decembre:+,.0f}€")
+    print(f"{p.compte}: Déc={p.decembre_brut:,.0f}€, Run rate={p.run_rate:,.0f}€, Écart={p.ecart_decembre:+,.0f}€")
+```
 
-# Anomalies statistiques (z-score)
+### 2. Détecter les anomalies statistiques
+
+```python
+# Z-score pour identifier les mois anormaux
 anomalies = normalizer.detect_anomalies()
-for a in anomalies[:5]:
-    print(f"{a.compte} {a.mois}: {a.nature} (z={a.z_score:+.1f})")
+for a in anomalies:
+    print(f"{a.compte} mois {a.mois}: {a.nature} (z={a.z_score:+.1f})")
 ```
 
-### Drill-down sur un compte
+### 3. Analyser les journaux OD/Situation
 
 ```python
-from gl_normalizer.drilldown import VariationDrilldown
+from gl_normalizer import ContentAnalyzer
 
-drilldown = VariationDrilldown(df_2024, df_2025, 2024, 2025)
-analysis = drilldown.analyze_account("631111000")
+analyzer = ContentAnalyzer(df, 2025)
 
-# Rapport formaté
-print(drilldown.format_drilldown_report(analysis))
-
-# Ou accès aux données
-print(f"Nouvelles écritures: {len(analysis.groupes_nouvelles)}")
-print(f"Écritures disparues: {len(analysis.groupes_disparues)}")
+# Identifier les journaux de régularisation
+journals = analyzer.analyze_journals()
+for j in journals:
+    if j.is_od or j.is_situation:
+        print(f"Journal {j.journal}: {j.nb_ecritures} écritures, {j.pct_decembre:.0f}% en décembre")
 ```
 
-### Comparaison complète avec rapport
+### 4. Module IA - Détection avancée
 
 ```python
-from gl_normalizer import GLComparator, generate_excel_report, generate_text_report
+from gl_normalizer.ai import RiskScorer
 
-comparator = GLComparator("GL_2024.xlsx", "GL_2025.xlsx")
-comparison = comparator.compare()
+# Score de risque multi-modèles
+scorer = RiskScorer(df)
+scorer.fit()
 
-# Rapport Excel multi-onglets
-generate_excel_report(comparison, "rapport.xlsx", comparator)
+# Écritures les plus suspectes
+top_risks = scorer.get_top_anomalies(100)
+print(top_risks[["compte", "libelle", "montant", "final_score", "risk_level"]])
 
-# Rapport texte
-print(generate_text_report(comparison))
+# Explication d'une écriture
+explanation = scorer.explain_entry(top_risks.index[0])
+print(f"Facteurs: {explanation['contributing_factors']}")
 ```
 
 ## Structure du package
@@ -112,71 +131,76 @@ print(generate_text_report(comparison))
 ```
 gl_normalizer/
 ├── __init__.py          # API publique
-├── config.py            # Configuration et constantes
-├── loader.py            # Chargement et harmonisation GL
+├── config.py            # Configuration
+├── loader.py            # Chargement GL (multi-formats)
 ├── classifier.py        # Classification des écritures
-├── pnl_normalizer.py    # Redistribution des provisions
-├── drilldown.py         # Analyse fine par compte
-├── comparator.py        # Comparaison inter-années
-└── reporter.py          # Génération des rapports
+├── pnl_normalizer.py    # Calcul du run rate
+├── content_analyzer.py  # Analyse OD/patterns
+├── drilldown.py         # Analyse par compte
+├── comparator.py        # Comparaison N vs N-1
+├── reporter.py          # Rapports Excel/texte
+└── ai/                  # Module IA
+    ├── benford.py       # Loi de Benford
+    ├── isolation_forest.py
+    ├── autoencoder.py   # Deep Learning
+    ├── nlp_analyzer.py  # Analyse libellés
+    ├── xgboost_scorer.py
+    └── risk_scorer.py   # Score combiné
 ```
 
 ## Méthodologie
 
-### 1. Chargement & Harmonisation
-- Détection automatique du format (Sage, Cegid, export brut)
-- Normalisation des colonnes : date, compte, journal, débit, crédit
-- Ajout colonnes calculées : période, classe, racine
+### Calcul du Run Rate
 
-### 2. Classification des Écritures
-- Identification des contreparties bilan (classe 4)
-- Attribution d'un type : RUN_RATE, SEASONAL, ESTIMATIF, ONE_SHOT
-- Règles basées sur : journal, contrepartie, libellé, montant
-
-### 3. Détection d'Anomalies
-```
-Z-score = (Valeur_mois - Moyenne_année) / Écart_type_année
-
-EXCES si : Z > seuil ET |écart| > min_absolu ET |écart%| > min_pct
-DEFICIT si : Z < -seuil (mêmes conditions)
-```
-
-### 4. Redistribution des Provisions
 ```
 Total_annuel = Σ(charges mois 1 à 12)
 Run_rate_mensuel = Total_annuel / 12
-Décembre_normalisé = Run_rate_mensuel
-Impact = Décembre_normalisé - Décembre_brut
+
+Si Décembre_brut >> Run_rate_mensuel → Concentration suspecte
+Si Décembre_brut << Run_rate_mensuel → Sous-provisionnement
 ```
 
-### 5. Drill-down
-- Normalisation des libellés (retrait dates, numéros)
-- Regroupement par nature
-- Identification : NOUVELLES, DISPARUES, VARIÉES
-- Construction du bridge de variation
+### Indicateurs de provisions suspectes
 
-## Configuration
+| Indicateur | Signal |
+|------------|--------|
+| Concentration > 50% en décembre | Provision annuelle concentrée |
+| Z-score > 2 | Mois statistiquement anormal |
+| Journal OD + montant rond | Écriture de régularisation |
+| Libellé "provision", "dotation", "reprise" | Écriture de provision |
+| Écart N/N-1 > 30% sans explication | Enveloppe modifiée |
 
-```python
-from gl_normalizer import NormalizerConfig
+### Module IA - Techniques utilisées
 
-config = NormalizerConfig(
-    z_score_threshold=1.5,      # Écarts-types pour anomalie
-    min_ecart_absolu=2000,      # € minimum pour signaler
-    min_ecart_pct=30,           # % minimum pour signaler
-    seuil_regul=2000,           # Régularisation significative
-)
+| Technique | Usage |
+|-----------|-------|
+| **Loi de Benford** | Détecter les montants fabriqués |
+| **Isolation Forest** | Anomalies non supervisées |
+| **Autoencoder** | Patterns complexes |
+| **NLP** | Libellés suspects |
+| **XGBoost** | Classification à risque |
 
-comparison = compare_years("GL_2024.xlsx", "GL_2025.xlsx", config=config)
-```
+## Formats supportés
+
+- Sage
+- Cegid
+- Quadratus
+- EBP
+- Export Excel générique
+
+Détection automatique du format et mapping des colonnes.
 
 ## Limites
 
-- Ne juge pas la pertinence comptable des écritures
-- Ne détecte pas les erreurs de classification de compte
-- N'anticipe pas les provisions futures
-- Ne remplace pas le jugement de l'analyste
+- **Nécessite une comptabilité mensuelle** - Pas d'analyse possible sur comptabilité annuelle
+- Ne juge pas la pertinence économique des provisions
+- Ne détecte pas les erreurs d'imputation comptable
+- Ne remplace pas le jugement de l'analyste/auditeur
 
 ## Licence
 
 MIT
+
+## Version
+
+2.0.0 - Avec module IA
