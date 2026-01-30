@@ -190,12 +190,53 @@ Si Décembre_brut << Run_rate_mensuel → Sous-provisionnement
 
 Détection automatique du format et mapping des colonnes.
 
-## Limites
+## Workflow d'analyse
 
-- **Nécessite une comptabilité mensuelle** - Pas d'analyse possible sur comptabilité annuelle
-- Ne juge pas la pertinence économique des provisions
-- Ne détecte pas les erreurs d'imputation comptable
-- Ne remplace pas le jugement de l'analyste/auditeur
+L'outil structure une démarche de **levée de non-conformité** :
+
+```
+1. DÉTECTION
+   └── Anomalies identifiées automatiquement
+
+2. INTERROGATION
+   └── Questions générées pour chaque anomalie
+       - "Pourquoi cette provision existe-t-elle encore ?"
+       - "Quelle est la justification de cette variation ?"
+       - "Ce montant est-il cohérent avec l'activité ?"
+
+3. DOCUMENTATION
+   └── Rapport structuré pour lever les doutes
+       - Liste des points à clarifier
+       - Éléments de réponse attendus
+       - Suivi des résolutions
+```
+
+### Output attendu
+
+| Élément | Description |
+|---------|-------------|
+| **Liste des anomalies** | Écritures/comptes suspects avec score de risque |
+| **Questions à poser** | Interrogations générées automatiquement |
+| **Fiche de levée** | Template pour documenter les réponses |
+| **Synthèse** | Run rate dépollué après levée des doutes |
+
+## Limites & Précautions
+
+| Aspect | Limite | Mais... |
+|--------|--------|---------|
+| **Pertinence comptable** | Ne juge pas si une provision est "correcte" | Interroge systématiquement les anomalies |
+| **Imputation comptable** | Ne corrige pas les erreurs de compte | Détecte les incohérences à investiguer |
+| **Jugement final** | Ne décide pas à la place de l'analyste | Structure la démarche et les questions |
+
+> **L'outil n'est pas un substitut à l'analyse humaine, mais un assistant qui :**
+> - Automatise la détection
+> - Structure les interrogations
+> - Documente le processus de levée
+> - Trace les réponses obtenues
+
+## Prérequis technique
+
+- **Comptabilité mensuelle obligatoire** - L'analyse repose sur les patterns mensuels
 
 ## Licence
 

@@ -58,7 +58,7 @@ Usage avancé:
     print(drilldown.format_drilldown_report(analysis))
 """
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __author__ = "GL Normalizer Team"
 
 # API publique principale
@@ -92,6 +92,16 @@ from .reporter import (
     TextReporter,
     generate_excel_report,
     generate_text_report,
+)
+from .questioner import (
+    Questioner,
+    Question,
+    PointLevee,
+    FicheLevee,
+    AnomalyType,
+    ResolutionStatus,
+    generate_questions,
+    generate_fiche_levee,
 )
 from .config import (
     NormalizerConfig,
@@ -142,6 +152,15 @@ __all__ = [
     "TextReporter",
     "generate_excel_report",
     "generate_text_report",
+    # Questioner (Levée de non-conformité)
+    "Questioner",
+    "Question",
+    "PointLevee",
+    "FicheLevee",
+    "AnomalyType",
+    "ResolutionStatus",
+    "generate_questions",
+    "generate_fiche_levee",
     # Config
     "NormalizerConfig",
     "EntryType",
