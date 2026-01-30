@@ -121,10 +121,16 @@ class GLComparator:
     def _detect_year(self, df: pd.DataFrame) -> int:
         """Détecte l'année principale d'un GL"""
         if "annee" in df.columns:
-            return int(df["annee"].mode().iloc[0])
+            mode_values = df["annee"].mode()
+            if len(mode_values) == 0:
+                raise ValueError("Aucune année détectable dans la colonne 'annee'")
+            return int(mode_values.iloc[0])
         elif "date" in df.columns:
             dates = pd.to_datetime(df["date"], errors="coerce")
-            return int(dates.dt.year.mode().iloc[0])
+            mode_values = dates.dt.year.mode()
+            if len(mode_values) == 0:
+                raise ValueError("Aucune année détectable dans la colonne 'date'")
+            return int(mode_values.iloc[0])
         raise ValueError("Impossible de détecter l'année du GL")
 
     def compare(

@@ -17,10 +17,13 @@ Fonctionnalités:
 
 import pandas as pd
 import numpy as np
+import logging
 from pathlib import Path
 from typing import Optional, Union, List, Dict, Tuple
 from datetime import datetime
 from difflib import SequenceMatcher
+
+logger = logging.getLogger(__name__)
 
 from .config import (
     COLUMN_MAPPINGS,
@@ -358,8 +361,12 @@ class GLLoader:
         """Ajoute les colonnes calculées"""
         df = self.df.copy()
 
-        # Convertir la date
+        # Convertir la date avec logging des erreurs
+        dates_avant = df["date"].notna().sum()
         df["date"] = pd.to_datetime(df["date"], errors="coerce", dayfirst=True)
+        dates_invalides = dates_avant - df["date"].notna().sum()
+        if dates_invalides > 0:
+            logger.warning(f"{dates_invalides} dates invalides converties en NaT")
 
         # Extraire période, année, mois
         df["annee"] = df["date"].dt.year
@@ -372,9 +379,18 @@ class GLLoader:
         df["racine_2"] = df["compte"].str[:2]
         df["racine_3"] = df["compte"].str[:3]
 
-        # Calculer le montant signé (débit - crédit)
+        # Calculer le montant signé (débit - crédit) avec logging
+        debit_avant = df["debit"].notna().sum()
         df["debit"] = pd.to_numeric(df["debit"], errors="coerce").fillna(0)
+        debit_invalides = debit_avant - (df["debit"] != 0).sum()
+
+        credit_avant = df["credit"].notna().sum()
         df["credit"] = pd.to_numeric(df["credit"], errors="coerce").fillna(0)
+        credit_invalides = credit_avant - (df["credit"] != 0).sum()
+
+        if debit_invalides > 0 or credit_invalides > 0:
+            logger.warning(f"Montants non numériques: {debit_invalides} débits, {credit_invalides} crédits")
+
         df["montant"] = df["debit"] - df["credit"]
 
         # Normaliser les colonnes analytiques

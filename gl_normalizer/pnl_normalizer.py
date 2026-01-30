@@ -108,7 +108,13 @@ class AnomalyDetection:
 
 @dataclass
 class NormalizedPLResult:
-    """Résultat complet de la normalisation P&L"""
+    """
+    Résultat complet de la normalisation P&L.
+
+    Note: Seules les charges sont normalisées. Les produits restent à leur
+    valeur brute (produits_normalises == produits_bruts) car la normalisation
+    cible uniquement les provisions de charges.
+    """
 
     year: int
 
@@ -117,9 +123,9 @@ class NormalizedPLResult:
     produits_bruts: float
     resultat_brut: float
 
-    # Totaux normalisés
+    # Totaux normalisés (produits non modifiés, seules charges ajustées)
     charges_normalisees: float
-    produits_normalises: float
+    produits_normalises: float  # = produits_bruts (non ajusté)
     resultat_normalise: float
 
     # Impact de la normalisation

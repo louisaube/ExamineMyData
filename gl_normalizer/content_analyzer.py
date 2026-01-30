@@ -165,8 +165,8 @@ class ContentAnalyzer:
             self.df = self.df[self.df["annee"] == year].copy()
 
         # Normaliser les libellés pour recherche
-        if "libelle" in self.df.columns:
-            self.df["libelle_lower"] = self.df["libelle"].fillna("").str.lower()
+        if "libelle" in self.df.columns and not self.df.empty:
+            self.df["libelle_lower"] = self.df["libelle"].fillna("").astype(str).str.lower()
 
         # Compiler tous les patterns
         self._compile_patterns()
@@ -289,6 +289,15 @@ class ContentAnalyzer:
             return "RECURRENT"
         return "AUTRE"
 
+    def _safe_get_december_od(self, od_concentration: pd.DataFrame) -> float:
+        """Récupère le % OD de décembre de manière sécurisée"""
+        if od_concentration.empty:
+            return 0.0
+        december_data = od_concentration[od_concentration["Mois"] == 12]["% OD"]
+        if december_data.empty:
+            return 0.0
+        return float(december_data.iloc[0])
+
     def analyze_account_content(
         self,
         compte: str,
@@ -377,11 +386,11 @@ class ContentAnalyzer:
         Returns:
             DataFrame avec % OD par mois
         """
-        if "journal" not in self.df.columns or "mois" not in self.df.columns:
+        if "journal" not in self.df.columns or "mois" not in self.df.columns or self.df.empty:
             return pd.DataFrame()
 
         # Identifier les écritures OD
-        mask_od = self.df["journal"].fillna("").str.upper().apply(
+        mask_od = self.df["journal"].fillna("").astype(str).str.upper().apply(
             lambda x: any(od in x for od in self.JOURNAUX_OD + self.JOURNAUX_SITUATION)
         )
 
@@ -425,8 +434,8 @@ class ContentAnalyzer:
                     mask |= self.df["libelle_lower"].str.contains(regex, na=False, regex=True)
 
         # Ajouter les écritures de journaux OD
-        if "journal" in self.df.columns:
-            mask_od = self.df["journal"].fillna("").str.upper().apply(
+        if "journal" in self.df.columns and not self.df.empty:
+            mask_od = self.df["journal"].fillna("").astype(str).str.upper().apply(
                 lambda x: any(od in x for od in self.JOURNAUX_OD + self.JOURNAUX_SITUATION)
             )
             mask |= mask_od
@@ -461,7 +470,7 @@ class ContentAnalyzer:
             "montant_regul": sum(p.montant_net for p in patterns_regul),
             "patterns_except": len(patterns_except),
             "montant_except": sum(p.montant_net for p in patterns_except),
-            "pct_od_decembre": od_concentration[od_concentration["Mois"] == 12]["% OD"].values[0] if len(od_concentration) > 0 else 0,
+            "pct_od_decembre": self._safe_get_december_od(od_concentration),
         }
 
 

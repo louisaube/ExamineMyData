@@ -23,13 +23,16 @@ class ExcelReporter:
     """
     Générateur de rapports Excel multi-onglets.
 
-    Onglets générés:
+    Onglets générés (toujours présents):
     - Synthèse: Vue d'ensemble de la comparaison
     - Réconciliation: Bridge brut → normalisé
     - Provisions N-1: Détail des ajustements N-1
     - Provisions N: Détail des ajustements N
     - Anomalies: Toutes les anomalies détectées
-    - Drill-down: Analyse des top variations
+
+    Onglets conditionnels:
+    - Drill-down: Analyse des top variations (si top_variations présent)
+    - Mensuel N-1/N: Données mensuelles (si comparator fourni)
     """
 
     def __init__(self, comparison: YearComparison, comparator: Optional[GLComparator] = None):
