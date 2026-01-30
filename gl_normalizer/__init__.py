@@ -58,7 +58,7 @@ Usage avancé:
     print(drilldown.format_drilldown_report(analysis))
 """
 
-__version__ = "1.1.0"
+__version__ = "2.0.0"
 __author__ = "GL Normalizer Team"
 
 # API publique principale
@@ -150,4 +150,16 @@ __all__ = [
     "REQUIRED_COLUMNS",
     "OPTIONAL_COLUMNS",
     "STANDARD_ANALYTICAL_COLUMNS",
+    # AI Module
+    "ai",
 ]
+
+# AI Module - Import conditionnel pour ne pas bloquer si dépendances manquantes
+try:
+    from . import ai
+except ImportError as e:
+    import warnings
+    warnings.warn(
+        f"Module AI non disponible (dépendances manquantes): {e}. "
+        "Installez avec: pip install scikit-learn xgboost torch sentence-transformers"
+    )
