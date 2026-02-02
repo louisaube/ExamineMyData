@@ -1,0 +1,24 @@
+# BMAD Method v6 - Project Configuration
+# GL Normalizer - Outil d'analyse des provisions comptables
+
+project_name: "GL Normalizer"
+project_type: "library"  # web-app, mobile-app, api, game, library, other
+project_level: 2  # 0-4 (0=single story, 1=1-10 stories, 2=5-15, 3=12-40, 4=40+)
+
+# Output folder (relative to project root)
+output_folder: "docs"
+
+# Language settings
+communication_language: "French"
+output_language: "French"
+
+# Module-specific settings
+bmm:
+  workflow_status_file: "docs/bmm-workflow-status.yaml"
+  sprint_status_file: "docs/sprint-status.yaml"
+
+# Path configuration
+paths:
+  docs: "docs"
+  stories: "docs/stories"
+  tests: "tests"

@@ -1,0 +1,103 @@
+# BMAD Method Workflow Status
+# Generated: 2026-02-02
+# Project: GL Normalizer
+
+project_name: "GL Normalizer"
+project_type: "library"
+project_level: 2
+communication_language: "French"
+output_language: "French"
+last_updated: "2026-02-02"
+
+# Description du projet
+project_description: |
+  Outil d'analyse du Grand Livre (GL) qui dépollue le P&L des artefacts
+  comptables (provisions injustifiées, enveloppes gonflées/dégonflées)
+  pour calculer le run rate réel de l'entreprise.
+
+# Modules existants
+existing_modules:
+  - name: "Core Analysis"
+    files: ["loader.py", "classifier.py", "pnl_normalizer.py"]
+    status: "implemented"
+  - name: "Content Analyzer"
+    files: ["content_analyzer.py", "drilldown.py"]
+    status: "implemented"
+  - name: "AI Module"
+    files: ["ai/benford.py", "ai/isolation_forest.py", "ai/autoencoder.py", "ai/nlp_analyzer.py", "ai/xgboost_scorer.py", "ai/risk_scorer.py"]
+    status: "implemented"
+  - name: "Reporting"
+    files: ["reporter.py", "comparator.py"]
+    status: "implemented"
+  - name: "Questioner"
+    files: ["questioner.py"]
+    status: "implemented"
+  - name: "Security"
+    files: ["security.py"]
+    status: "implemented"
+
+# Workflow Status Tracking
+# Status values:
+#   - "required" - Must be completed
+#   - "optional" - Can be skipped
+#   - "recommended" - Strongly suggested
+#   - "conditional" - Required based on project level
+#   - "{file-path}" - Completed (path to output file)
+#   - "skipped" - Explicitly skipped
+
+workflow_status:
+  # Phase 1: Analysis (Optional but recommended)
+  - name: product-brief
+    phase: 1
+    status: "optional"
+    description: "Create comprehensive product brief"
+    note: "Le README.md existant couvre partiellement ce besoin"
+
+  - name: brainstorm-project
+    phase: 1
+    status: "optional"
+    description: "Structured brainstorming session"
+
+  - name: research
+    phase: 1
+    status: "optional"
+    description: "Market and competitive research"
+
+  # Phase 2: Planning (Required - choose one based on project level)
+  - name: prd
+    phase: 2
+    status: "required"  # required for level 2+
+    description: "Product Requirements Document"
+    note: "À créer pour documenter les exigences détaillées"
+
+  - name: tech-spec
+    phase: 2
+    status: "optional"  # optional for level 2+
+    description: "Technical Specification"
+
+  - name: create-ux-design
+    phase: 2
+    status: "optional"
+    description: "UX/UI design workflow"
+    note: "N/A - Library sans interface utilisateur"
+
+  # Phase 3: Solutioning (Conditional on project level)
+  - name: architecture
+    phase: 3
+    status: "required"  # required for level 2+
+    description: "System architecture design"
+    note: "À documenter - architecture existante à formaliser"
+
+  - name: solutioning-gate-check
+    phase: 3
+    status: "optional"
+    description: "Validate architecture against requirements"
+
+  # Phase 4: Implementation (Required)
+  # Note: Implementation tracked in sprint-status.yaml
+
+# Prochaines étapes recommandées
+next_steps:
+  - "Créer le PRD pour formaliser les exigences"
+  - "Documenter l'architecture existante"
+  - "Planifier le sprint pour les améliorations"

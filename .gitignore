@@ -69,3 +69,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# BMAD skills (installed separately)
+claude-code-bmad-skills/
