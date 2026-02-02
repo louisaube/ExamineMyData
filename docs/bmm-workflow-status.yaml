@@ -1,0 +1,63 @@
+# BMAD Method v6 - Workflow Status
+# Project: ExamineMyData
+# Level: 2 (Medium feature set)
+# Generated: 2026-02-02
+
+metadata:
+  project_name: "ExamineMyData"
+  project_type: "web-app"
+  project_level: 2
+  initialized_at: "2026-02-02T14:50:00Z"
+  last_updated: "2026-02-02T14:50:00Z"
+
+# Phase 1: Discovery
+phase_1_discovery:
+  product_brief:
+    status: "not_started"  # not_started | in_progress | completed | skipped
+    requirement: "recommended"  # required | recommended | optional
+    file: null
+    completed_at: null
+
+# Phase 2: Requirements
+phase_2_requirements:
+  prd:
+    status: "not_started"
+    requirement: "required"  # Level 2+ requires PRD
+    file: null
+    completed_at: null
+  tech_spec:
+    status: "not_started"
+    requirement: "optional"  # Level 2+ makes tech-spec optional
+    file: null
+    completed_at: null
+
+# Phase 3: Architecture
+phase_3_architecture:
+  architecture:
+    status: "not_started"
+    requirement: "required"  # Level 2+ requires architecture
+    file: null
+    completed_at: null
+  solutioning_gate:
+    status: "not_started"
+    requirement: "recommended"
+    passed: false
+    completed_at: null
+
+# Phase 4: Implementation
+phase_4_implementation:
+  sprint_planning:
+    status: "not_started"
+    requirement: "required"
+    current_sprint: null
+    total_sprints: null
+  stories:
+    total: 0
+    completed: 0
+    in_progress: 0
+    pending: 0
+
+# Current workflow position
+current_phase: 1
+current_step: "product_brief"
+next_recommended_action: "/product-brief"
