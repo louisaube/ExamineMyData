@@ -164,6 +164,10 @@ class ContentAnalyzer:
         if "annee" in self.df.columns:
             self.df = self.df[self.df["annee"] == year].copy()
 
+        # Calculer montant si absent
+        if "montant" not in self.df.columns and "debit" in self.df.columns and "credit" in self.df.columns:
+            self.df["montant"] = self.df["debit"] - self.df["credit"]
+
         # Normaliser les libellés pour recherche
         if "libelle" in self.df.columns and not self.df.empty:
             self.df["libelle_lower"] = self.df["libelle"].fillna("").astype(str).str.lower()
