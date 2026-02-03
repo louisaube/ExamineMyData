@@ -23,6 +23,15 @@ from gl_normalizer import (
     generate_excel_report,
     check_file_size,
 )
+from gl_normalizer.secrets_manager import (
+    get_secrets_manager,
+    SecretType,
+    KNOWN_SECRETS,
+)
+from gl_normalizer.autonomous_drilldown import (
+    AutonomousAnalyzer,
+    run_autonomous_analysis,
+)
 
 app = FastAPI(title="GL Normalizer", description="Analyse et normalisation du P&L")
 
@@ -136,6 +145,13 @@ def run_analysis_background(job_id: str, path1: Path, year1: int, path2: Optiona
 
             analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Calcul du run rate...", 80)
 
+            # STORY-030: Analyse autonome IA (drill-down proactif)
+            analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Analyse proactive IA...", 90)
+            try:
+                autonomous_analysis = run_autonomous_analysis(df1, auto_execute=False)
+            except Exception:
+                autonomous_analysis = None
+
             analysis_cache.set(job_id, {
                 "type": "single",
                 "status": JobStatus.COMPLETED.value,
@@ -143,6 +159,7 @@ def run_analysis_background(job_id: str, path1: Path, year1: int, path2: Optiona
                 "year": year1,
                 "path": str(path1),
                 "df": df1,
+                "autonomous_analysis": autonomous_analysis,
                 "message": "Analyse terminée",
                 "progress": 100,
             })
@@ -302,6 +319,8 @@ async def results(request: Request, job_id: str):
             "summary": result.summary if hasattr(result, 'summary') else {},
             "warnings": result.warnings[:5] if hasattr(result, 'warnings') else [],
             "recommendations": result.recommendations[:5] if hasattr(result, 'recommendations') else [],
+            # STORY-030: Analyse autonome IA
+            "autonomous_analysis": data.get("autonomous_analysis"),
         }
 
     return templates.TemplateResponse("results.html", context)
@@ -410,6 +429,233 @@ async def download_report(job_id: str):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur génération rapport: {str(e)}")
+
+
+# =====================================================
+# SETTINGS - Configuration des tokens API (STORY-027)
+# =====================================================
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    """Page de configuration des tokens API"""
+    secrets_mgr = get_secrets_manager()
+
+    # Construire la liste des providers avec leur statut
+    providers = []
+    for secret_type, config in KNOWN_SECRETS.items():
+        value = secrets_mgr.get_secret(secret_type, prompt_if_missing=False)
+        configured = value is not None
+
+        providers.append({
+            "type": secret_type.value,
+            "name": config.name,
+            "description": config.description,
+            "configured": configured,
+            "masked": secrets_mgr.mask_secret(value) if configured else "",
+            "placeholder": f"Commence par {config.required_prefix}..." if config.required_prefix else "Entrez votre token",
+            "hint": f"Variable env: {config.env_var}",
+        })
+
+    return templates.TemplateResponse("settings.html", {
+        "request": request,
+        "providers": providers,
+        "ai_ready": secrets_mgr.is_ai_ready(),
+    })
+
+
+@app.get("/api/settings/status")
+async def get_settings_status():
+    """Retourne le statut des tokens (sans les valeurs)"""
+    secrets_mgr = get_secrets_manager()
+    status = secrets_mgr.get_status()
+
+    return JSONResponse({
+        "ai_ready": secrets_mgr.is_ai_ready(),
+        "providers": status,
+    })
+
+
+@app.post("/api/settings/token")
+async def save_token(request: Request):
+    """Sauvegarde un token API"""
+    try:
+        data = await request.json()
+        token_type = data.get("type")
+        token_value = data.get("token")
+
+        if not token_type or not token_value:
+            return JSONResponse({"success": False, "error": "Type et token requis"}, status_code=400)
+
+        # Trouver le SecretType correspondant
+        secret_type = None
+        for st in SecretType:
+            if st.value == token_type:
+                secret_type = st
+                break
+
+        if secret_type is None:
+            return JSONResponse({"success": False, "error": "Type de token inconnu"}, status_code=400)
+
+        secrets_mgr = get_secrets_manager()
+
+        # Valider le format
+        validation = secrets_mgr.validate_secret(token_value, secret_type)
+        if not validation.is_valid:
+            return JSONResponse({
+                "success": False,
+                "error": f"Format invalide: {', '.join(validation.errors)}"
+            }, status_code=400)
+
+        # Sauvegarder
+        secrets_mgr.set_secret(secret_type, token_value)
+
+        return JSONResponse({"success": True, "message": "Token configuré"})
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.delete("/api/settings/token/{token_type}")
+async def delete_token(token_type: str):
+    """Supprime un token API"""
+    try:
+        secret_type = None
+        for st in SecretType:
+            if st.value == token_type:
+                secret_type = st
+                break
+
+        if secret_type is None:
+            return JSONResponse({"success": False, "error": "Type de token inconnu"}, status_code=400)
+
+        secrets_mgr = get_secrets_manager()
+        secrets_mgr.delete_secret(secret_type)
+
+        return JSONResponse({"success": True, "message": "Token supprimé"})
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/settings/test/{token_type}")
+async def test_token(token_type: str, request: Request):
+    """Teste la validité d'un token"""
+    try:
+        data = await request.json()
+        token_value = data.get("token")
+
+        if not token_value:
+            return JSONResponse({"valid": False, "error": "Token requis"}, status_code=400)
+
+        secret_type = None
+        for st in SecretType:
+            if st.value == token_type:
+                secret_type = st
+                break
+
+        if secret_type is None:
+            return JSONResponse({"valid": False, "error": "Type de token inconnu"}, status_code=400)
+
+        secrets_mgr = get_secrets_manager()
+        validation = secrets_mgr.validate_secret(token_value, secret_type)
+
+        return JSONResponse({
+            "valid": validation.is_valid,
+            "errors": validation.errors,
+            "warnings": validation.warnings,
+        })
+
+    except Exception as e:
+        return JSONResponse({"valid": False, "error": str(e)}, status_code=500)
+
+
+# =====================================================
+# DRILLDOWN API - Analyse autonome IA (STORY-030)
+# =====================================================
+
+@app.post("/api/drilldown/{job_id}/{question_id}")
+async def execute_drilldown(job_id: str, question_id: str):
+    """Exécute une analyse drill-down spécifique"""
+    try:
+        data = analysis_cache.get(job_id)
+        if data is None:
+            return JSONResponse({"success": False, "error": "Job non trouvé"}, status_code=404)
+
+        if data.get("status") != JobStatus.COMPLETED.value:
+            return JSONResponse({"success": False, "error": "Analyse pas encore terminée"}, status_code=400)
+
+        df = data.get("df")
+        if df is None:
+            return JSONResponse({"success": False, "error": "Données non disponibles"}, status_code=400)
+
+        autonomous_data = data.get("autonomous_analysis")
+        if not autonomous_data or not autonomous_data.get("questions"):
+            return JSONResponse({"success": False, "error": "Pas de questions disponibles"}, status_code=400)
+
+        # Trouver la question
+        question = None
+        for q in autonomous_data["questions"]:
+            if q["id"] == question_id:
+                question = q
+                break
+
+        if question is None:
+            return JSONResponse({"success": False, "error": "Question non trouvée"}, status_code=404)
+
+        # Recréer l'analyzer et exécuter
+        analyzer = AutonomousAnalyzer(df)
+        analyzer.patterns = []  # On a juste besoin d'exécuter
+
+        # Reconstruire la question object
+        from gl_normalizer.autonomous_drilldown import Question, QuestionType, DrilldownExecutor
+        q_obj = Question(
+            question_id=question["id"],
+            question_type=QuestionType(question["type"]),
+            text=question["text"],
+            pattern_ref=question.get("pattern_ref"),
+            parameters=question.get("parameters", {}),
+            priority=question.get("priority", 5)
+        )
+
+        executor = DrilldownExecutor(df)
+        result = executor.execute(q_obj)
+
+        # Ajouter au cache pour affichage futur
+        if "executed_results" not in autonomous_data:
+            autonomous_data["executed_results"] = []
+        autonomous_data["executed_results"].append(result.to_dict())
+
+        return JSONResponse(result.to_dict())
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/drilldown/{job_id}")
+async def get_drilldown_data(job_id: str):
+    """Récupère les données de l'analyse autonome"""
+    try:
+        data = analysis_cache.get(job_id)
+        if data is None:
+            return JSONResponse({"success": False, "error": "Job non trouvé"}, status_code=404)
+
+        autonomous_data = data.get("autonomous_analysis")
+        if not autonomous_data:
+            return JSONResponse({
+                "success": True,
+                "patterns": [],
+                "questions": [],
+                "results": [],
+                "summary": {"pattern_count": 0, "question_count": 0}
+            })
+
+        return JSONResponse({
+            "success": True,
+            **autonomous_data
+        })
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
 if __name__ == "__main__":

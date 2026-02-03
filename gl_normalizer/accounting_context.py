@@ -185,6 +185,100 @@ COMPTES_REGUL_TYPIQUES = {
     "468": "Divers - Charges à payer",
 }
 
+# Comptes d'immobilisations (classe 2) - mouvements annuels normaux
+PCG_IMMOBILISATIONS = {
+    # Immobilisations incorporelles (20)
+    "201": ("Frais d'établissement", "immob_incorp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "203": ("Frais de R&D", "immob_incorp", ChargeFrequency.VARIABLE, AccountBehavior.PONCTUEL),
+    "205": ("Concessions et droits", "immob_incorp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "206": ("Droit au bail", "immob_incorp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "207": ("Fonds commercial", "immob_incorp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "208": ("Autres immob. incorporelles", "immob_incorp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+
+    # Immobilisations corporelles (21)
+    "211": ("Terrains", "immob_corp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "212": ("Agencements de terrains", "immob_corp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "213": ("Constructions", "immob_corp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "214": ("Constructions sur sol d'autrui", "immob_corp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "215": ("Installations techniques", "immob_corp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "218": ("Autres immob. corporelles", "immob_corp", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+
+    # Immobilisations en cours (23)
+    "231": ("Immob. corporelles en cours", "immob_encours", ChargeFrequency.VARIABLE, AccountBehavior.PONCTUEL),
+    "232": ("Immob. incorporelles en cours", "immob_encours", ChargeFrequency.VARIABLE, AccountBehavior.PONCTUEL),
+    "237": ("Avances et acomptes immob.", "immob_encours", ChargeFrequency.VARIABLE, AccountBehavior.PONCTUEL),
+
+    # Participations et créances (26, 27)
+    "261": ("Titres de participation", "immob_fin", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "267": ("Créances rattachées à participations", "immob_fin", ChargeFrequency.VARIABLE, AccountBehavior.PONCTUEL),
+    "271": ("Titres immobilisés", "immob_fin", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "272": ("Titres immobilisés - droits de créance", "immob_fin", ChargeFrequency.VARIABLE, AccountBehavior.PONCTUEL),
+    "274": ("Prêts", "immob_fin", ChargeFrequency.VARIABLE, AccountBehavior.PONCTUEL),
+    "275": ("Dépôts et cautionnements", "immob_fin", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+
+    # Amortissements des immobilisations (28)
+    "280": ("Amort. immob. incorporelles", "amortissement", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+    "281": ("Amort. immob. corporelles", "amortissement", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+    "282": ("Amort. immob. mises en concession", "amortissement", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+
+    # Dépréciations des immobilisations (29)
+    "290": ("Dépréc. immob. incorporelles", "depreciation", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+    "291": ("Dépréc. immob. corporelles", "depreciation", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+    "293": ("Dépréc. immob. en cours", "depreciation", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+    "296": ("Dépréc. participations", "depreciation", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+    "297": ("Dépréc. autres immob. fin.", "depreciation", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+}
+
+# Comptes de tiers (classe 4) - régularisations fréquentes
+PCG_TIERS = {
+    # Fournisseurs (40)
+    "401": ("Fournisseurs", "fournisseurs", ChargeFrequency.MENSUELLE, AccountBehavior.REGULIER),
+    "403": ("Fournisseurs - Effets à payer", "fournisseurs", ChargeFrequency.VARIABLE, AccountBehavior.REGULIER),
+    "404": ("Fournisseurs d'immobilisations", "fournisseurs", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+    "408": ("Fournisseurs - Factures non parvenues", "regularisation", ChargeFrequency.ANNUELLE, AccountBehavior.REGULARISATION),
+    "409": ("Fournisseurs débiteurs", "fournisseurs", ChargeFrequency.VARIABLE, AccountBehavior.REGULIER),
+
+    # Clients (41)
+    "411": ("Clients", "clients", ChargeFrequency.MENSUELLE, AccountBehavior.REGULIER),
+    "413": ("Clients - Effets à recevoir", "clients", ChargeFrequency.VARIABLE, AccountBehavior.REGULIER),
+    "416": ("Clients douteux", "clients", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+    "418": ("Clients - Produits non encore facturés", "regularisation", ChargeFrequency.ANNUELLE, AccountBehavior.REGULARISATION),
+    "419": ("Clients créditeurs", "clients", ChargeFrequency.VARIABLE, AccountBehavior.REGULIER),
+
+    # Personnel (42)
+    "421": ("Personnel - Rémunérations dues", "personnel", ChargeFrequency.MENSUELLE, AccountBehavior.REGULIER),
+    "422": ("Comités d'entreprise", "personnel", ChargeFrequency.MENSUELLE, AccountBehavior.REGULIER),
+    "425": ("Personnel - Avances et acomptes", "personnel", ChargeFrequency.MENSUELLE, AccountBehavior.REGULIER),
+    "427": ("Personnel - Oppositions", "personnel", ChargeFrequency.MENSUELLE, AccountBehavior.REGULIER),
+    "428": ("Personnel - Charges à payer", "regularisation", ChargeFrequency.ANNUELLE, AccountBehavior.REGULARISATION),
+    "429": ("Déficits et débets", "personnel", ChargeFrequency.EXCEPTIONNELLE, AccountBehavior.PONCTUEL),
+
+    # Organismes sociaux (43)
+    "431": ("Sécurité sociale", "social", ChargeFrequency.MENSUELLE, AccountBehavior.REGULIER),
+    "437": ("Autres organismes sociaux", "social", ChargeFrequency.MENSUELLE, AccountBehavior.REGULIER),
+    "438": ("Organismes sociaux - Charges à payer", "regularisation", ChargeFrequency.ANNUELLE, AccountBehavior.REGULARISATION),
+
+    # État (44)
+    "441": ("État - Subventions à recevoir", "etat", ChargeFrequency.VARIABLE, AccountBehavior.PONCTUEL),
+    "442": ("État - Impôts et taxes recouvrables", "etat", ChargeFrequency.VARIABLE, AccountBehavior.REGULIER),
+    "443": ("Opérations particulières avec l'État", "etat", ChargeFrequency.VARIABLE, AccountBehavior.REGULIER),
+    "444": ("État - IS", "etat", ChargeFrequency.ANNUELLE, AccountBehavior.REGULARISATION),
+    "445": ("État - Taxes sur le CA", "etat", ChargeFrequency.MENSUELLE, AccountBehavior.REGULIER),
+    "447": ("Autres impôts, taxes", "etat", ChargeFrequency.VARIABLE, AccountBehavior.REGULIER),
+    "448": ("État - Charges à payer", "regularisation", ChargeFrequency.ANNUELLE, AccountBehavior.REGULARISATION),
+    "449": ("Quotas d'émission", "etat", ChargeFrequency.ANNUELLE, AccountBehavior.PONCTUEL),
+
+    # Comptes transitoires (48)
+    "486": ("Charges constatées d'avance", "regularisation", ChargeFrequency.ANNUELLE, AccountBehavior.REGULARISATION),
+    "487": ("Produits constatés d'avance", "regularisation", ChargeFrequency.ANNUELLE, AccountBehavior.REGULARISATION),
+    "488": ("Comptes de répartition périodique", "regularisation", ChargeFrequency.MENSUELLE, AccountBehavior.REGULIER),
+
+    # Provisions pour dépréciation (49)
+    "491": ("Provisions pour dépréc. clients", "depreciation", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+    "495": ("Provisions pour dépréc. groupe", "depreciation", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+    "496": ("Provisions pour dépréc. débiteurs", "depreciation", ChargeFrequency.ANNUELLE, AccountBehavior.PROVISION),
+}
+
 
 class AccountingContext:
     """
@@ -202,7 +296,7 @@ class AccountingContext:
             version: Version du PCG (pour évolution future)
         """
         self.version = version
-        self._pcg = {**PCG_CHARGES, **PCG_PRODUITS}
+        self._pcg = {**PCG_CHARGES, **PCG_PRODUITS, **PCG_IMMOBILISATIONS, **PCG_TIERS}
         self._regul_comptes = COMPTES_REGUL_TYPIQUES
 
     def load_pcg(self) -> pd.DataFrame:

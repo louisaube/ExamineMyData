@@ -188,6 +188,34 @@ from .advanced_stats import (
     analyze_seasonality,
     cluster_accounts,
 )
+from .polars_backend import (
+    DataBackend,
+    get_backend,
+    set_backend,
+    is_polars_available,
+    is_polars_active,
+)
+from .pattern_detector import (
+    PatternDetector,
+    Pattern,
+    PatternType,
+    PatternSeverity,
+    detect_patterns,
+)
+from .autonomous_drilldown import (
+    AutonomousAnalyzer,
+    DrilldownGenerator,
+    DrilldownExecutor,
+    DrilldownResult,
+    Question,
+    QuestionType,
+    run_autonomous_analysis,
+)
+from .ai_drilldown import (
+    AIAnalyzer,
+    get_ai_analyzer,
+    enhance_analysis_with_ai,
+)
 
 # Exports publics
 __all__ = [
@@ -313,6 +341,30 @@ __all__ = [
     "detect_anomalies_robust",
     "analyze_seasonality",
     "cluster_accounts",
+    # Polars Backend
+    "DataBackend",
+    "get_backend",
+    "set_backend",
+    "is_polars_available",
+    "is_polars_active",
+    # Pattern Detector (STORY-030)
+    "PatternDetector",
+    "Pattern",
+    "PatternType",
+    "PatternSeverity",
+    "detect_patterns",
+    # Autonomous Drilldown (STORY-030)
+    "AutonomousAnalyzer",
+    "DrilldownGenerator",
+    "DrilldownExecutor",
+    "DrilldownResult",
+    "Question",
+    "QuestionType",
+    "run_autonomous_analysis",
+    # AI Drilldown (STORY-030)
+    "AIAnalyzer",
+    "get_ai_analyzer",
+    "enhance_analysis_with_ai",
     # AI Module
     "ai",
 ]

@@ -50,6 +50,16 @@ class ContextualizedAnomaly:
 
 
 @dataclass
+class PLCategory:
+    """Catégorie de P&L avec montants"""
+    name: str
+    code: str
+    total: float
+    count: int  # Nombre de comptes
+    pct_total: float  # % du total charges ou produits
+
+
+@dataclass
 class RunRateResult:
     """Résultat du calcul du run rate"""
     year: int
@@ -74,6 +84,10 @@ class RunRateResult:
 
     # Confiance
     confidence_score: float       # 0-1
+
+    # Détail P&L par catégorie
+    charges_by_category: List[PLCategory] = field(default_factory=list)
+    produits_by_category: List[PLCategory] = field(default_factory=list)
 
 
 @dataclass
@@ -261,9 +275,12 @@ class GLAnalyzer:
         is_expected = False
         category = AnomalyCategory.CONCENTRATION_ANORMALE
 
+        # Classe du compte (1er caractère)
+        classe = compte[0] if compte else ""
+
         if classif:
-            # Les comptes annuels ont une concentration normale
-            if classif.frequency.value == "annuelle":
+            # Les comptes annuels/exceptionnels ont une concentration normale
+            if classif.frequency.value in ["annuelle", "exceptionnelle"]:
                 is_expected = True
                 category = AnomalyCategory.CONCENTRATION_EXPLIQUEE
 
@@ -271,6 +288,29 @@ class GLAnalyzer:
             if classif.is_provision_compte:
                 is_expected = True
                 category = AnomalyCategory.PROVISION_NORMALE
+
+            # Les régularisations sont normales en fin d'année
+            if classif.behavior.value == "regularisation":
+                is_expected = True
+                category = AnomalyCategory.REGULARISATION_NORMALE
+
+        # Règles par classe de compte (même sans classification PCG détaillée)
+        if classe == "2":
+            # Immobilisations : mouvements ponctuels normaux
+            is_expected = True
+            category = AnomalyCategory.CONCENTRATION_EXPLIQUEE
+        elif classe == "1":
+            # Capitaux : mouvements exceptionnels normaux
+            is_expected = True
+            category = AnomalyCategory.CONCENTRATION_EXPLIQUEE
+        elif compte[:2] in ["68", "78"]:
+            # Dotations/Reprises : concentration normale
+            is_expected = True
+            category = AnomalyCategory.PROVISION_NORMALE
+        elif compte[:3] in ["486", "487", "408", "418", "428", "438", "448"]:
+            # Comptes de régularisation
+            is_expected = True
+            category = AnomalyCategory.REGULARISATION_NORMALE
 
         # Sévérité ajustée selon contexte
         if is_expected:
@@ -287,11 +327,27 @@ class GLAnalyzer:
             category=category,
             montant=conc.amount,
             details=f"{conc.percentage:.1f}% sur {conc.dimension}",
-            pcg_context=classif.libelle_pcg if classif else None,
+            pcg_context=classif.libelle_pcg if classif else self._get_default_pcg_context(compte),
             is_expected=is_expected,
             severity=severity,
             recommendation=self._get_concentration_recommendation(is_expected, conc.percentage),
         )
+
+    def _get_default_pcg_context(self, compte: str) -> str:
+        """Retourne un contexte PCG par défaut basé sur la classe du compte"""
+        if not compte:
+            return ""
+        classe = compte[0]
+        contexts = {
+            "1": "Comptes de capitaux",
+            "2": "Immobilisations (mouvement ponctuel normal)",
+            "3": "Stocks et en-cours",
+            "4": "Comptes de tiers",
+            "5": "Comptes financiers",
+            "6": "Charges",
+            "7": "Produits",
+        }
+        return contexts.get(classe, "")
 
     def _contextualize_round_amount(self, rond) -> ContextualizedAnomaly:
         """Contextualise un montant rond avec le PCG"""
@@ -362,10 +418,17 @@ class GLAnalyzer:
             norm_result = normalizer.compute_normalized_december()
 
             # Calcul du run rate annuel
-            charges_annuelles = self.df[self.df["classe"] == "6"]["montant"].sum()
-            produits_annuels = self.df[self.df["classe"] == "7"]["montant"].sum()
+            df_charges = self.df[self.df["classe"] == "6"]
+            df_produits = self.df[self.df["classe"] == "7"]
+
+            charges_annuelles = df_charges["montant"].sum()
+            produits_annuels = df_produits["montant"].sum()
 
             run_rate_mensuel = abs(charges_annuelles) / 12
+
+            # Calcul du détail par catégorie de charges
+            charges_by_cat = self._compute_pl_categories(df_charges, "charges")
+            produits_by_cat = self._compute_pl_categories(df_produits, "produits")
 
             return RunRateResult(
                 year=self.year,
@@ -380,9 +443,73 @@ class GLAnalyzer:
                 nb_comptes_ajustes=norm_result.nb_comptes_ajustes,
                 run_rate_mensuel=run_rate_mensuel,
                 confidence_score=0.8,  # TODO: calculer
+                charges_by_category=charges_by_cat,
+                produits_by_category=produits_by_cat,
             )
         except Exception as e:
             return None
+
+    def _compute_pl_categories(self, df: pd.DataFrame, pl_type: str) -> List[PLCategory]:
+        """Calcule le détail P&L par catégorie"""
+        if df.empty or "compte" not in df.columns:
+            return []
+
+        # Mapping des racines vers catégories
+        if pl_type == "charges":
+            cat_mapping = {
+                "60": ("Achats", "60"),
+                "61": ("Services extérieurs", "61"),
+                "62": ("Autres services ext.", "62"),
+                "63": ("Impôts et taxes", "63"),
+                "64": ("Charges de personnel", "64"),
+                "65": ("Autres charges gestion", "65"),
+                "66": ("Charges financières", "66"),
+                "67": ("Charges exceptionnelles", "67"),
+                "68": ("Dotations amort./prov.", "68"),
+                "69": ("Impôt sur les bénéfices", "69"),
+            }
+        else:
+            cat_mapping = {
+                "70": ("Ventes et prestations", "70"),
+                "71": ("Production stockée", "71"),
+                "72": ("Production immobilisée", "72"),
+                "74": ("Subventions", "74"),
+                "75": ("Autres produits gestion", "75"),
+                "76": ("Produits financiers", "76"),
+                "77": ("Produits exceptionnels", "77"),
+                "78": ("Reprises amort./prov.", "78"),
+                "79": ("Transferts de charges", "79"),
+            }
+
+        # Extraire la racine à 2 caractères
+        df = df.copy()
+        df["racine"] = df["compte"].astype(str).str[:2]
+
+        # Agréger par racine
+        agg = df.groupby("racine").agg(
+            total=("montant", lambda x: abs(x.sum())),
+            count=("compte", "nunique")
+        ).reset_index()
+
+        total_all = agg["total"].sum()
+
+        categories = []
+        for _, row in agg.iterrows():
+            racine = row["racine"]
+            if racine in cat_mapping:
+                name, code = cat_mapping[racine]
+                pct = (row["total"] / total_all * 100) if total_all > 0 else 0
+                categories.append(PLCategory(
+                    name=name,
+                    code=code,
+                    total=row["total"],
+                    count=int(row["count"]),
+                    pct_total=pct,
+                ))
+
+        # Trier par montant décroissant
+        categories.sort(key=lambda x: x.total, reverse=True)
+        return categories
 
     def _compute_overall_risk(self, result: FullAnalysisResult) -> float:
         """Calcule le score de risque global"""

@@ -93,31 +93,39 @@ phase_4_implementation:
 
 # Sprint 6 - UX & Performance (NEW)
 sprint_6_backlog:
-  status: "in_progress"
+  status: "completed"
   stories:
     - id: "STORY-027"
       title: "Configuration UI tokens API"
       file: "docs/stories/STORY-027-ui-token-configuration.md"
-      status: "pending"
+      status: "completed"
       priority: "high"
       points: 3
     - id: "STORY-028"
       title: "Migration Polars performance"
       file: "docs/stories/STORY-028-polars-migration.md"
-      status: "pending"
+      status: "completed"
       priority: "medium"
       points: 8
+      notes: "Dual-mode backend Polars/Pandas, CSV 10x plus rapide"
     - id: "STORY-029"
       title: "Amélioration affichage résultats"
       status: "completed"
       priority: "high"
       points: 2
       notes: "Corrigé bugs affichage, ajouté traitement async"
+    - id: "STORY-030"
+      title: "Autonomie encadrée de l'IA (drill-down auto)"
+      file: "docs/stories/STORY-030-ai-autonomous-drilldown.md"
+      status: "completed"
+      priority: "medium"
+      points: 5
+      notes: "Implémenté: pattern_detector.py, autonomous_drilldown.py, UI drill-down"
 
 # Current workflow position
 current_phase: 4
 current_step: "sprint_6"
-next_recommended_action: "Implémenter STORY-027 (tokens UI)"
+next_recommended_action: "Sprint 6 terminé - Toutes les features UX implémentées"
 
 # Notes
 notes: |
