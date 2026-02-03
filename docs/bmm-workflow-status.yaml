@@ -8,7 +8,7 @@ metadata:
   project_type: "web-app"
   project_level: 2
   initialized_at: "2026-02-02T14:50:00Z"
-  last_updated: "2026-02-03T14:00:00Z"
+  last_updated: "2026-02-03T16:00:00Z"
 
 # Phase 1: Discovery
 phase_1_discovery:
@@ -53,8 +53,8 @@ phase_4_implementation:
     current_sprint: 1
     total_sprints: 3
   stories:
-    total: 24
-    completed: 24
+    total: 27
+    completed: 27
     in_progress: 0
     pending: 0
     completed_stories:
@@ -86,6 +86,10 @@ phase_4_implementation:
       # Sprint 4 - Sécurité (NEW)
       - "STORY-022: Gestion sécurisée tokens API [NEW]"
       - "STORY-023: Protection secrets .gitignore [NEW]"
+      # Sprint 5 - Algorithmes avancés (NEW)
+      - "STORY-024: MAD + IQR adaptatif (advanced_stats.py) [NEW]"
+      - "STORY-025: STL Decomposition saisonnalité [NEW]"
+      - "STORY-026: Clustering comportemental comptes [NEW]"
 
 # Current workflow position
 current_phase: 5
@@ -94,7 +98,7 @@ next_recommended_action: "Documentation utilisateur"
 
 # Notes
 notes: |
-  Projet complet (v2.1.0 -> v2.5.0)
+  Projet complet (v2.1.0 -> v2.6.0)
 
   Session 1 - Nouveaux modules:
   - accounting_context.py: Référentiel PCG français
@@ -109,3 +113,11 @@ notes: |
   - .gitignore: Protection des fichiers sensibles
   - Chiffrement local des secrets
   - Validation des formats de tokens
+
+  Session 3 - Algorithmes avancés:
+  - advanced_stats.py: Méthodes statistiques robustes
+    - MADDetector: Median Absolute Deviation (robuste aux outliers)
+    - IQRDetector: Interquartile Range (méthode Tukey)
+    - SeasonalDecomposer: Décomposition saisonnière STL simplifié
+    - AccountClusterer: Clustering comportemental des comptes
+  - 24 tests unitaires + intégration

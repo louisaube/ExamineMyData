@@ -58,7 +58,7 @@ Usage avancé:
     print(drilldown.format_drilldown_report(analysis))
 """
 
-__version__ = "2.5.0"
+__version__ = "2.6.0"
 __author__ = "GL Normalizer Team"
 
 # API publique principale
@@ -172,6 +172,22 @@ from .secrets_manager import (
     setup_secrets,
     check_ai_ready,
 )
+from .advanced_stats import (
+    MADDetector,
+    MADResult,
+    IQRDetector,
+    IQRResult,
+    SeasonalDecomposer,
+    SeasonalityResult,
+    SeasonalPattern,
+    AccountClusterer,
+    ClusterResult,
+    ClusteringSummary,
+    AccountBehaviorCluster,
+    detect_anomalies_robust,
+    analyze_seasonality,
+    cluster_accounts,
+)
 
 # Exports publics
 __all__ = [
@@ -282,6 +298,21 @@ __all__ = [
     "get_api_key",
     "setup_secrets",
     "check_ai_ready",
+    # Advanced Stats
+    "MADDetector",
+    "MADResult",
+    "IQRDetector",
+    "IQRResult",
+    "SeasonalDecomposer",
+    "SeasonalityResult",
+    "SeasonalPattern",
+    "AccountClusterer",
+    "ClusterResult",
+    "ClusteringSummary",
+    "AccountBehaviorCluster",
+    "detect_anomalies_robust",
+    "analyze_seasonality",
+    "cluster_accounts",
     # AI Module
     "ai",
 ]
