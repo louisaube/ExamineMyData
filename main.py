@@ -23,6 +23,11 @@ from gl_normalizer import (
     generate_excel_report,
     check_file_size,
 )
+from gl_normalizer.secrets_manager import (
+    get_secrets_manager,
+    SecretType,
+    KNOWN_SECRETS,
+)
 
 app = FastAPI(title="GL Normalizer", description="Analyse et normalisation du P&L")
 
@@ -410,6 +415,144 @@ async def download_report(job_id: str):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur génération rapport: {str(e)}")
+
+
+# =====================================================
+# SETTINGS - Configuration des tokens API (STORY-027)
+# =====================================================
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    """Page de configuration des tokens API"""
+    secrets_mgr = get_secrets_manager()
+
+    # Construire la liste des providers avec leur statut
+    providers = []
+    for secret_type, config in KNOWN_SECRETS.items():
+        value = secrets_mgr.get_secret(secret_type, prompt_if_missing=False)
+        configured = value is not None
+
+        providers.append({
+            "type": secret_type.value,
+            "name": config.name,
+            "description": config.description,
+            "configured": configured,
+            "masked": secrets_mgr.mask_secret(value) if configured else "",
+            "placeholder": f"Commence par {config.required_prefix}..." if config.required_prefix else "Entrez votre token",
+            "hint": f"Variable env: {config.env_var}",
+        })
+
+    return templates.TemplateResponse("settings.html", {
+        "request": request,
+        "providers": providers,
+        "ai_ready": secrets_mgr.is_ai_ready(),
+    })
+
+
+@app.get("/api/settings/status")
+async def get_settings_status():
+    """Retourne le statut des tokens (sans les valeurs)"""
+    secrets_mgr = get_secrets_manager()
+    status = secrets_mgr.get_status()
+
+    return JSONResponse({
+        "ai_ready": secrets_mgr.is_ai_ready(),
+        "providers": status,
+    })
+
+
+@app.post("/api/settings/token")
+async def save_token(request: Request):
+    """Sauvegarde un token API"""
+    try:
+        data = await request.json()
+        token_type = data.get("type")
+        token_value = data.get("token")
+
+        if not token_type or not token_value:
+            return JSONResponse({"success": False, "error": "Type et token requis"}, status_code=400)
+
+        # Trouver le SecretType correspondant
+        secret_type = None
+        for st in SecretType:
+            if st.value == token_type:
+                secret_type = st
+                break
+
+        if secret_type is None:
+            return JSONResponse({"success": False, "error": "Type de token inconnu"}, status_code=400)
+
+        secrets_mgr = get_secrets_manager()
+
+        # Valider le format
+        validation = secrets_mgr.validate_secret(token_value, secret_type)
+        if not validation.is_valid:
+            return JSONResponse({
+                "success": False,
+                "error": f"Format invalide: {', '.join(validation.errors)}"
+            }, status_code=400)
+
+        # Sauvegarder
+        secrets_mgr.set_secret(secret_type, token_value)
+
+        return JSONResponse({"success": True, "message": "Token configuré"})
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.delete("/api/settings/token/{token_type}")
+async def delete_token(token_type: str):
+    """Supprime un token API"""
+    try:
+        secret_type = None
+        for st in SecretType:
+            if st.value == token_type:
+                secret_type = st
+                break
+
+        if secret_type is None:
+            return JSONResponse({"success": False, "error": "Type de token inconnu"}, status_code=400)
+
+        secrets_mgr = get_secrets_manager()
+        secrets_mgr.delete_secret(secret_type)
+
+        return JSONResponse({"success": True, "message": "Token supprimé"})
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.post("/api/settings/test/{token_type}")
+async def test_token(token_type: str, request: Request):
+    """Teste la validité d'un token"""
+    try:
+        data = await request.json()
+        token_value = data.get("token")
+
+        if not token_value:
+            return JSONResponse({"valid": False, "error": "Token requis"}, status_code=400)
+
+        secret_type = None
+        for st in SecretType:
+            if st.value == token_type:
+                secret_type = st
+                break
+
+        if secret_type is None:
+            return JSONResponse({"valid": False, "error": "Type de token inconnu"}, status_code=400)
+
+        secrets_mgr = get_secrets_manager()
+        validation = secrets_mgr.validate_secret(token_value, secret_type)
+
+        return JSONResponse({
+            "valid": validation.is_valid,
+            "errors": validation.errors,
+            "warnings": validation.warnings,
+        })
+
+    except Exception as e:
+        return JSONResponse({"valid": False, "error": str(e)}, status_code=500)
 
 
 if __name__ == "__main__":

@@ -95,6 +95,80 @@
         </div>
     </div>
 
+    <!-- P&L Détaillé -->
+    {% if run_rate and (run_rate.charges_by_category or run_rate.produits_by_category) %}
+    <div class="pl-section">
+        <h3>Compte de Résultat</h3>
+        <div class="pl-container">
+            <!-- Charges -->
+            <div class="pl-column">
+                <h4>Charges</h4>
+                <table class="pl-table">
+                    <thead>
+                        <tr>
+                            <th>Catégorie</th>
+                            <th class="amount">Montant</th>
+                            <th class="pct">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cat in run_rate.charges_by_category %}
+                        <tr>
+                            <td><span class="cat-code">{{ cat.code }}</span> {{ cat.name }}</td>
+                            <td class="amount">{{ "{:,.0f}".format(cat.total) }} €</td>
+                            <td class="pct">{{ "{:.1f}".format(cat.pct_total) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td><strong>Total Charges</strong></td>
+                            <td class="amount"><strong>{{ "{:,.0f}".format(run_rate.charges_brutes) }} €</strong></td>
+                            <td class="pct">100%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Produits -->
+            <div class="pl-column">
+                <h4>Produits</h4>
+                <table class="pl-table">
+                    <thead>
+                        <tr>
+                            <th>Catégorie</th>
+                            <th class="amount">Montant</th>
+                            <th class="pct">%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cat in run_rate.produits_by_category %}
+                        <tr>
+                            <td><span class="cat-code">{{ cat.code }}</span> {{ cat.name }}</td>
+                            <td class="amount">{{ "{:,.0f}".format(cat.total) }} €</td>
+                            <td class="pct">{{ "{:.1f}".format(cat.pct_total) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td><strong>Total Produits</strong></td>
+                            <td class="amount"><strong>{{ "{:,.0f}".format(run_rate.produits_bruts) }} €</strong></td>
+                            <td class="pct">100%</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- Résultat -->
+        <div class="resultat-box {% if run_rate.resultat_brut >= 0 %}resultat-positif{% else %}resultat-negatif{% endif %}">
+            <span class="resultat-label">Résultat</span>
+            <span class="resultat-value">{{ "{:+,.0f}".format(run_rate.resultat_brut) }} €</span>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Warnings -->
     {% if warnings %}
     <div class="warnings-section">
@@ -337,6 +411,126 @@ tr.severity-high { background: #ffe5d0; }
 
 .data-table tbody tr:hover {
     background: #f1f3f5;
+}
+
+/* P&L Section */
+.pl-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.pl-section h3 {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #007bff;
+}
+
+.pl-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+@media (max-width: 768px) {
+    .pl-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pl-column h4 {
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+.pl-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    background: white;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.pl-table th {
+    background: #495057;
+    color: white;
+    padding: 0.5rem;
+    text-align: left;
+}
+
+.pl-table td {
+    padding: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.pl-table .amount {
+    text-align: right;
+    font-family: monospace;
+    white-space: nowrap;
+}
+
+.pl-table .pct {
+    text-align: right;
+    color: #6c757d;
+    width: 60px;
+}
+
+.pl-table .total-row {
+    background: #e9ecef;
+}
+
+.pl-table .total-row td {
+    border-bottom: none;
+}
+
+.cat-code {
+    display: inline-block;
+    background: #6c757d;
+    color: white;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    margin-right: 0.5rem;
+}
+
+.resultat-box {
+    margin-top: 1.5rem;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.resultat-positif {
+    background: linear-gradient(135deg, #d4edda, #c3e6cb);
+    border: 2px solid #28a745;
+}
+
+.resultat-negatif {
+    background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+    border: 2px solid #dc3545;
+}
+
+.resultat-label {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.resultat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    font-family: monospace;
+}
+
+.resultat-positif .resultat-value {
+    color: #155724;
+}
+
+.resultat-negatif .resultat-value {
+    color: #721c24;
 }
 </style>
 {% endblock %}

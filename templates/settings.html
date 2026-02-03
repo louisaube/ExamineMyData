@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration - GL Normalizer{% endblock %}
+
+{% block content %}
+<div class="settings-section">
+    <h2>Configuration des API</h2>
+    <p class="settings-intro">
+        Configurez vos clés API pour activer les fonctionnalités d'intelligence artificielle
+        (analyse NLP, scoring avancé, détection d'anomalies par ML).
+    </p>
+
+    <!-- Statut global -->
+    <div class="ai-status-box {% if ai_ready %}ai-ready{% else %}ai-not-ready{% endif %}">
+        <span class="ai-status-icon">{% if ai_ready %}{% else %}{% endif %}</span>
+        <span class="ai-status-text">
+            {% if ai_ready %}
+            IA activée - Au moins un provider est configuré
+            {% else %}
+            IA désactivée - Configurez au moins un provider
+            {% endif %}
+        </span>
+    </div>
+
+    <!-- Formulaires de configuration -->
+    <div class="providers-grid">
+        {% for provider in providers %}
+        <div class="provider-card {% if provider.configured %}configured{% endif %}">
+            <div class="provider-header">
+                <h3>{{ provider.name }}</h3>
+                <span class="provider-status">
+                    {% if provider.configured %}
+                    <span class="status-badge status-ok">Configuré</span>
+                    {% else %}
+                    <span class="status-badge status-none">Non configuré</span>
+                    {% endif %}
+                </span>
+            </div>
+
+            <p class="provider-desc">{{ provider.description }}</p>
+
+            {% if provider.configured %}
+            <div class="current-value">
+                <span class="masked-value">{{ provider.masked }}</span>
+                <button class="btn btn-sm btn-danger" onclick="deleteToken('{{ provider.type }}')">
+                    Supprimer
+                </button>
+            </div>
+            {% endif %}
+
+            <form class="token-form" onsubmit="saveToken(event, '{{ provider.type }}')">
+                <div class="form-group">
+                    <label for="token-{{ provider.type }}">
+                        {% if provider.configured %}Nouveau token{% else %}Token API{% endif %}
+                    </label>
+                    <input
+                        type="password"
+                        id="token-{{ provider.type }}"
+                        name="token"
+                        placeholder="{{ provider.placeholder }}"
+                        class="form-control"
+                    >
+                    <small class="form-hint">{{ provider.hint }}</small>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        {% if provider.configured %}Mettre à jour{% else %}Configurer{% endif %}
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="testToken('{{ provider.type }}')">
+                        Tester
+                    </button>
+                </div>
+            </form>
+
+            <div class="validation-result" id="result-{{ provider.type }}"></div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Informations -->
+    <div class="info-section">
+        <h3>Fonctionnalités par provider</h3>
+        <table class="features-table">
+            <thead>
+                <tr>
+                    <th>Fonctionnalité</th>
+                    <th>OpenAI</th>
+                    <th>Anthropic</th>
+                    <th>HuggingFace</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Analyse NLP des libellés</td>
+                    <td>oui</td>
+                    <td>oui</td>
+                    <td>oui</td>
+                </tr>
+                <tr>
+                    <td>Embeddings sémantiques</td>
+                    <td>oui</td>
+                    <td>-</td>
+                    <td>oui</td>
+                </tr>
+                <tr>
+                    <td>Classification automatique</td>
+                    <td>oui</td>
+                    <td>oui</td>
+                    <td>oui</td>
+                </tr>
+                <tr>
+                    <td>Génération de rapports</td>
+                    <td>oui</td>
+                    <td>oui</td>
+                    <td>-</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="actions">
+        <a href="/" class="btn btn-secondary">Retour à l'accueil</a>
+    </div>
+</div>
+
+<style>
+.settings-section {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.settings-intro {
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.ai-status-box {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.ai-ready {
+    background: #d4edda;
+    border: 1px solid #28a745;
+}
+
+.ai-not-ready {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+}
+
+.ai-status-icon {
+    font-size: 1.5rem;
+}
+
+.providers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.provider-card {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.provider-card.configured {
+    border-color: #28a745;
+    background: #f8fff9;
+}
+
+.provider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.provider-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.status-ok {
+    background: #28a745;
+    color: white;
+}
+
+.status-none {
+    background: #6c757d;
+    color: white;
+}
+
+.provider-desc {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.current-value {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #e9ecef;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    font-family: monospace;
+}
+
+.masked-value {
+    color: #495057;
+}
+
+.token-form {
+    margin-top: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.form-hint {
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-sm {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.validation-result {
+    margin-top: 1rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    display: none;
+}
+
+.validation-result.success {
+    display: block;
+    background: #d4edda;
+    color: #155724;
+}
+
+.validation-result.error {
+    display: block;
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.info-section {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin: 2rem 0;
+}
+
+.features-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.features-table th,
+.features-table td {
+    padding: 0.5rem;
+    text-align: center;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.features-table th:first-child,
+.features-table td:first-child {
+    text-align: left;
+}
+
+.features-table thead th {
+    background: #495057;
+    color: white;
+}
+
+.actions {
+    margin-top: 2rem;
+}
+</style>
+
+<script>
+async function saveToken(event, providerType) {
+    event.preventDefault();
+    const input = document.getElementById(`token-${providerType}`);
+    const token = input.value.trim();
+    const resultDiv = document.getElementById(`result-${providerType}`);
+
+    if (!token) {
+        showResult(resultDiv, 'error', 'Veuillez entrer un token');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/settings/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: providerType, token: token })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showResult(resultDiv, 'success', 'Token configuré avec succès');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showResult(resultDiv, 'error', data.error || 'Erreur de configuration');
+        }
+    } catch (err) {
+        showResult(resultDiv, 'error', 'Erreur de connexion');
+    }
+}
+
+async function testToken(providerType) {
+    const input = document.getElementById(`token-${providerType}`);
+    const token = input.value.trim();
+    const resultDiv = document.getElementById(`result-${providerType}`);
+
+    if (!token) {
+        showResult(resultDiv, 'error', 'Veuillez entrer un token à tester');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/settings/test/${providerType}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token })
+        });
+
+        const data = await response.json();
+
+        if (data.valid) {
+            showResult(resultDiv, 'success', 'Token valide !');
+        } else {
+            showResult(resultDiv, 'error', data.error || 'Token invalide');
+        }
+    } catch (err) {
+        showResult(resultDiv, 'error', 'Erreur de test');
+    }
+}
+
+async function deleteToken(providerType) {
+    if (!confirm('Supprimer ce token ?')) return;
+
+    try {
+        const response = await fetch(`/api/settings/token/${providerType}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Erreur de suppression');
+        }
+    } catch (err) {
+        alert('Erreur de connexion');
+    }
+}
+
+function showResult(div, type, message) {
+    div.className = `validation-result ${type}`;
+    div.textContent = message;
+    div.style.display = 'block';
+}
+</script>
+{% endblock %}
