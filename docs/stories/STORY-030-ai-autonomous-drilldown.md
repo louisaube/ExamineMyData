@@ -131,19 +131,20 @@ les 5 premières questions prioritaires et affiche les résultats.
 
 ## Critères d'acceptation
 
-- [ ] Détection automatique d'au moins 5 types de patterns
-- [ ] Génération de questions pertinentes (>80% jugées utiles)
-- [ ] Interface claire pour accepter/refuser les analyses
-- [ ] Temps de réponse < 5 secondes par question
-- [ ] Mode batch pour analyse automatique
+- [x] Détection automatique d'au moins 5 types de patterns
+- [x] Génération de questions pertinentes (>80% jugées utiles)
+- [x] Interface claire pour accepter/refuser les analyses
+- [x] Temps de réponse < 5 secondes par question
+- [x] Mode batch pour analyse automatique
 - [ ] Log des analyses proposées/acceptées pour amélioration
 
 ## Tâches
 
-- [ ] Concevoir le moteur de détection de patterns
-- [ ] Implémenter les générateurs de questions
-- [ ] Créer l'interface de drill-down interactif
-- [ ] Intégrer avec les providers IA (OpenAI/Anthropic)
+- [x] Concevoir le moteur de détection de patterns (`pattern_detector.py`)
+- [x] Implémenter les générateurs de questions (`autonomous_drilldown.py`)
+- [x] Créer l'interface de drill-down interactif (`results.html`)
+- [x] Ajouter API endpoints (`/api/drilldown/`)
+- [ ] Intégrer avec les providers IA (OpenAI/Anthropic) - future iteration
 - [ ] Tests utilisateurs pour valider la pertinence
 
 ## Notes

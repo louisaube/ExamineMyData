@@ -234,6 +234,87 @@
     </div>
     {% endif %}
 
+    <!-- Analyse autonome IA (STORY-030) -->
+    {% if autonomous_analysis and autonomous_analysis.patterns %}
+    <div class="autonomous-section">
+        <h3>
+            Analyse proactive IA
+            <span class="badge badge-info">{{ autonomous_analysis.summary.pattern_count }} patterns</span>
+        </h3>
+        <p class="section-intro">L'IA a identifié des points nécessitant investigation approfondie.</p>
+
+        <!-- Patterns détectés -->
+        <div class="patterns-grid">
+            {% for pattern in autonomous_analysis.patterns[:5] %}
+            <div class="pattern-card pattern-{{ pattern.severity }}">
+                <div class="pattern-header">
+                    <span class="pattern-type">{{ pattern.type|replace('_', ' ')|title }}</span>
+                    <span class="severity-indicator severity-{{ pattern.severity }}">{{ pattern.severity|upper }}</span>
+                </div>
+                <h4 class="pattern-title">{{ pattern.title }}</h4>
+                <p class="pattern-desc">{{ pattern.description }}</p>
+
+                {% if pattern.questions %}
+                <div class="pattern-questions">
+                    <strong>Questions suggérées:</strong>
+                    <ul>
+                        {% for q in pattern.questions[:2] %}
+                        <li>
+                            <button class="btn-question"
+                                    data-account="{{ pattern.account }}"
+                                    data-question="{{ q }}">
+                                {{ q }}
+                            </button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Questions générées -->
+        {% if autonomous_analysis.questions %}
+        <div class="questions-section">
+            <h4>Analyses suggérées ({{ autonomous_analysis.questions|length }})</h4>
+            <div class="questions-list">
+                {% for q in autonomous_analysis.questions[:10] %}
+                <div class="question-item priority-{{ q.priority }}">
+                    <span class="question-priority">P{{ q.priority }}</span>
+                    <span class="question-text">{{ q.text }}</span>
+                    <button class="btn btn-sm btn-outline"
+                            onclick="executeDrilldown('{{ q.id }}', '{{ job_id }}')">
+                        Analyser
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Résultats exécutés (mode auto) -->
+        {% if autonomous_analysis.results %}
+        <div class="drilldown-results">
+            <h4>Résultats d'analyse</h4>
+            {% for result in autonomous_analysis.results %}
+            <div class="drilldown-result {% if result.success %}result-success{% else %}result-error{% endif %}">
+                <h5>{{ result.title }}</h5>
+                <p>{{ result.summary }}</p>
+                {% if result.insights %}
+                <ul class="insights-list">
+                    {% for insight in result.insights %}
+                    <li>{{ insight }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Régularisations -->
     {% if regularizations %}
     <div class="regularizations-section">
@@ -532,5 +613,240 @@ tr.severity-high { background: #ffe5d0; }
 .resultat-negatif .resultat-value {
     color: #721c24;
 }
+
+/* Analyse autonome IA (STORY-030) */
+.autonomous-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+    border-radius: 12px;
+    border: 2px solid #7c4dff;
+}
+
+.autonomous-section h3 {
+    color: #5e35b1;
+    margin-bottom: 0.5rem;
+}
+
+.section-intro {
+    color: #666;
+    margin-bottom: 1.5rem;
+}
+
+.patterns-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.pattern-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-left: 4px solid #6c757d;
+}
+
+.pattern-card.pattern-critical { border-left-color: #dc3545; }
+.pattern-card.pattern-high { border-left-color: #fd7e14; }
+.pattern-card.pattern-medium { border-left-color: #ffc107; }
+.pattern-card.pattern-low { border-left-color: #28a745; }
+
+.pattern-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.pattern-type {
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.severity-indicator {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.severity-indicator.severity-critical { background: #dc3545; color: white; }
+.severity-indicator.severity-high { background: #fd7e14; color: white; }
+.severity-indicator.severity-medium { background: #ffc107; color: black; }
+.severity-indicator.severity-low { background: #28a745; color: white; }
+
+.pattern-title {
+    font-size: 1rem;
+    margin: 0.5rem 0;
+    color: #333;
+}
+
+.pattern-desc {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.pattern-questions ul {
+    margin: 0.5rem 0 0 1rem;
+    padding: 0;
+}
+
+.pattern-questions li {
+    margin: 0.3rem 0;
+}
+
+.btn-question {
+    background: none;
+    border: 1px dashed #7c4dff;
+    color: #5e35b1;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    text-align: left;
+    transition: all 0.2s;
+}
+
+.btn-question:hover {
+    background: #7c4dff;
+    color: white;
+    border-style: solid;
+}
+
+.questions-section {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1.5rem;
+}
+
+.questions-section h4 {
+    margin-bottom: 1rem;
+    color: #5e35b1;
+}
+
+.questions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.question-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.question-priority {
+    background: #6c757d;
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.question-item.priority-1 .question-priority,
+.question-item.priority-2 .question-priority { background: #dc3545; }
+.question-item.priority-3 .question-priority,
+.question-item.priority-4 .question-priority { background: #fd7e14; }
+.question-item.priority-5 .question-priority,
+.question-item.priority-6 .question-priority { background: #ffc107; color: black; }
+
+.question-text {
+    flex: 1;
+    font-size: 0.9rem;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid #7c4dff;
+    color: #7c4dff;
+}
+
+.btn-outline:hover {
+    background: #7c4dff;
+    color: white;
+}
+
+.drilldown-results {
+    margin-top: 1.5rem;
+}
+
+.drilldown-results h4 {
+    color: #5e35b1;
+    margin-bottom: 1rem;
+}
+
+.drilldown-result {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #28a745;
+}
+
+.drilldown-result.result-error {
+    border-left-color: #dc3545;
+    background: #fff5f5;
+}
+
+.drilldown-result h5 {
+    margin: 0 0 0.5rem 0;
+    color: #333;
+}
+
+.drilldown-result p {
+    margin: 0 0 0.5rem 0;
+    color: #666;
+}
+
+.insights-list {
+    margin: 0.5rem 0 0 1rem;
+    padding: 0;
+}
+
+.insights-list li {
+    margin: 0.3rem 0;
+    font-size: 0.9rem;
+    color: #495057;
+}
 </style>
+
+<script>
+function executeDrilldown(questionId, jobId) {
+    // Appel API pour exécuter l'analyse drill-down
+    fetch(`/api/drilldown/${jobId}/${questionId}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Afficher le résultat
+            alert(`Analyse terminée: ${data.title}\n\n${data.summary}`);
+            // En production, on afficherait un modal ou on rechargerait la section
+            location.reload();
+        } else {
+            alert(`Erreur: ${data.summary}`);
+        }
+    })
+    .catch(error => {
+        console.error('Erreur:', error);
+        alert('Erreur lors de l\'analyse');
+    });
+}
+</script>
 {% endblock %}

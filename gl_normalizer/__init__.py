@@ -195,6 +195,22 @@ from .polars_backend import (
     is_polars_available,
     is_polars_active,
 )
+from .pattern_detector import (
+    PatternDetector,
+    Pattern,
+    PatternType,
+    PatternSeverity,
+    detect_patterns,
+)
+from .autonomous_drilldown import (
+    AutonomousAnalyzer,
+    DrilldownGenerator,
+    DrilldownExecutor,
+    DrilldownResult,
+    Question,
+    QuestionType,
+    run_autonomous_analysis,
+)
 
 # Exports publics
 __all__ = [
@@ -326,6 +342,20 @@ __all__ = [
     "set_backend",
     "is_polars_available",
     "is_polars_active",
+    # Pattern Detector (STORY-030)
+    "PatternDetector",
+    "Pattern",
+    "PatternType",
+    "PatternSeverity",
+    "detect_patterns",
+    # Autonomous Drilldown (STORY-030)
+    "AutonomousAnalyzer",
+    "DrilldownGenerator",
+    "DrilldownExecutor",
+    "DrilldownResult",
+    "Question",
+    "QuestionType",
+    "run_autonomous_analysis",
     # AI Module
     "ai",
 ]
