@@ -30,6 +30,7 @@ from .security import (
     SecurityLimits,
     SecurityError,
 )
+from .polars_backend import get_backend, is_polars_active
 
 logger = logging.getLogger(__name__)
 
@@ -311,6 +312,9 @@ class GLLoader:
         limits = SecurityLimits()
         check_file_size(self.file_path, limits)
 
+        # Obtenir le backend (Polars si disponible)
+        backend = get_backend()
+
         if suffix in [".xlsx", ".xls", ".xlsm"]:
             df = pd.read_excel(self.file_path, sheet_name=sheet_name, nrows=limits.max_rows)
         elif suffix == ".csv":
@@ -319,13 +323,17 @@ class GLLoader:
             for encoding in ["utf-8", "latin-1", "cp1252"]:
                 for sep in [";", ",", "\t"]:
                     try:
-                        df = pd.read_csv(
+                        # Utiliser le backend Polars/Pandas
+                        df = backend.read_csv(
                             self.file_path,
                             encoding=encoding,
-                            sep=sep,
-                            nrows=limits.max_rows
+                            separator=sep,
                         )
+                        # Limiter le nombre de lignes si nécessaire
+                        if len(df) > limits.max_rows:
+                            df = df.head(limits.max_rows)
                         if len(df.columns) > 1:
+                            logger.info(f"CSV chargé avec {backend.backend_name}: {len(df)} lignes")
                             break
                     except Exception:
                         continue

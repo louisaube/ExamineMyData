@@ -188,6 +188,13 @@ from .advanced_stats import (
     analyze_seasonality,
     cluster_accounts,
 )
+from .polars_backend import (
+    DataBackend,
+    get_backend,
+    set_backend,
+    is_polars_available,
+    is_polars_active,
+)
 
 # Exports publics
 __all__ = [
@@ -313,6 +320,12 @@ __all__ = [
     "detect_anomalies_robust",
     "analyze_seasonality",
     "cluster_accounts",
+    # Polars Backend
+    "DataBackend",
+    "get_backend",
+    "set_backend",
+    "is_polars_available",
+    "is_polars_active",
     # AI Module
     "ai",
 ]
