@@ -185,8 +185,11 @@ class Profiler:
                 unique_pct=unique_pct,
             )
 
-            # Stats numériques
-            if pd.api.types.is_numeric_dtype(series):
+            # Stats numériques (exclure booléens qui causent des problèmes avec quantile)
+            is_numeric = pd.api.types.is_numeric_dtype(series)
+            is_bool = pd.api.types.is_bool_dtype(series)
+
+            if is_numeric and not is_bool:
                 valid = series.dropna()
                 if len(valid) > 0:
                     profile.mean = float(valid.mean())
@@ -194,13 +197,19 @@ class Profiler:
                     profile.min = float(valid.min())
                     profile.max = float(valid.max())
                     profile.median = float(valid.median())
-                    profile.q25 = float(valid.quantile(0.25))
-                    profile.q75 = float(valid.quantile(0.75))
+                    try:
+                        profile.q25 = float(valid.quantile(0.25))
+                        profile.q75 = float(valid.quantile(0.75))
+                    except (TypeError, ValueError):
+                        pass  # Skip quantiles if type error
 
                     # Skewness et kurtosis si assez de données
                     if len(valid) > 3:
-                        profile.skewness = float(valid.skew())
-                        profile.kurtosis = float(valid.kurtosis())
+                        try:
+                            profile.skewness = float(valid.skew())
+                            profile.kurtosis = float(valid.kurtosis())
+                        except (TypeError, ValueError):
+                            pass
 
             # Stats catégorielles
             else:
