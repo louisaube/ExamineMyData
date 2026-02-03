@@ -1,0 +1,30 @@
+# BMAD Method v6 - Project Configuration
+# Generated: 2026-02-02
+
+project_name: "ExamineMyData"
+project_type: "web-app"
+project_level: 2
+
+output_folder: "docs"
+
+bmm:
+  workflow_status_file: "docs/bmm-workflow-status.yaml"
+  sprint_status_file: "docs/sprint-status.yaml"
+
+paths:
+  docs: "docs"
+  stories: "docs/stories"
+  tests: "tests"
+
+# Agent preferences (optional overrides)
+agents:
+  analyst:
+    enabled: true
+  pm:
+    enabled: true
+  architect:
+    enabled: true
+  developer:
+    enabled: true
+  scrum_master:
+    enabled: true
