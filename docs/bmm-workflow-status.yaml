@@ -98,7 +98,7 @@ sprint_6_backlog:
     - id: "STORY-027"
       title: "Configuration UI tokens API"
       file: "docs/stories/STORY-027-ui-token-configuration.md"
-      status: "pending"
+      status: "completed"
       priority: "high"
       points: 3
     - id: "STORY-028"
@@ -113,11 +113,18 @@ sprint_6_backlog:
       priority: "high"
       points: 2
       notes: "Corrigé bugs affichage, ajouté traitement async"
+    - id: "STORY-030"
+      title: "Autonomie encadrée de l'IA (drill-down auto)"
+      file: "docs/stories/STORY-030-ai-autonomous-drilldown.md"
+      status: "pending"
+      priority: "medium"
+      points: 5
+      notes: "Liberté d'interrogation dans un cadre défini"
 
 # Current workflow position
 current_phase: 4
 current_step: "sprint_6"
-next_recommended_action: "Implémenter STORY-027 (tokens UI)"
+next_recommended_action: "Tester améliorations UX puis STORY-028 (Polars)"
 
 # Notes
 notes: |
