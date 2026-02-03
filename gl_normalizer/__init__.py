@@ -211,6 +211,11 @@ from .autonomous_drilldown import (
     QuestionType,
     run_autonomous_analysis,
 )
+from .ai_drilldown import (
+    AIAnalyzer,
+    get_ai_analyzer,
+    enhance_analysis_with_ai,
+)
 
 # Exports publics
 __all__ = [
@@ -356,6 +361,10 @@ __all__ = [
     "Question",
     "QuestionType",
     "run_autonomous_analysis",
+    # AI Drilldown (STORY-030)
+    "AIAnalyzer",
+    "get_ai_analyzer",
+    "enhance_analysis_with_ai",
     # AI Module
     "ai",
 ]

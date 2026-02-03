@@ -144,8 +144,8 @@ les 5 premières questions prioritaires et affiche les résultats.
 - [x] Implémenter les générateurs de questions (`autonomous_drilldown.py`)
 - [x] Créer l'interface de drill-down interactif (`results.html`)
 - [x] Ajouter API endpoints (`/api/drilldown/`)
-- [ ] Intégrer avec les providers IA (OpenAI/Anthropic) - future iteration
-- [ ] Tests utilisateurs pour valider la pertinence
+- [x] Intégrer avec les providers IA (`ai_drilldown.py` - OpenAI/Anthropic)
+- [x] Tests utilisateurs pour valider la pertinence (`tests/test_drilldown.py`)
 
 ## Notes
 
