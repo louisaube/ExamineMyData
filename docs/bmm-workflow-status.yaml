@@ -54,24 +54,48 @@ phase_4_implementation:
     total_sprints: 3
   stories:
     total: 22
-    completed: 12
+    completed: 22
     in_progress: 0
-    pending: 10
+    pending: 0
     completed_stories:
-      - "STORY-000: Setup projet (CI GitHub Actions)"
-      - "STORY-001: Charger fichier Excel (déjà existant)"
-      - "STORY-002: Détecter format automatiquement (déjà existant)"
-      - "STORY-003: Mapping manuel colonnes (déjà existant)"
-      - "STORY-004: Détection concentrations"
-      - "STORY-005: Calcul Z-scores (déjà existant)"
-      - "STORY-006: Identifier provisions (enrichi PCG)"
-      - "STORY-007: Montants ronds"
-      - "STORY-008: Analyser journaux OD (régularisations)"
-      - "STORY-009: AccountingContext (PCG)"
-      - "STORY-010: Profiler (stats)"
-      - "STORY-011: Contextualiser anomalies PCG"
+      # Sprint 1 - Fondations
+      - "STORY-000: Setup projet (CI GitHub Actions) [NEW]"
+      - "STORY-001: Charger fichier Excel (GLLoader)"
+      - "STORY-002: Détecter format automatiquement (HeaderValidator)"
+      - "STORY-003: Mapping manuel colonnes (custom_mapping)"
+      - "STORY-004: Détection concentrations [NEW]"
+      - "STORY-005: Calcul Z-scores (detect_anomalies)"
+      - "STORY-006: Identifier provisions (PnLNormalizer)"
+      - "STORY-007: Montants ronds [NEW]"
+      - "STORY-008: Analyser journaux OD [NEW]"
+      - "STORY-009: AccountingContext PCG [NEW]"
+      - "STORY-010: Profiler stats [NEW]"
+      - "STORY-011: Contextualiser anomalies PCG [NEW]"
+      # Sprint 2 - MVP
+      - "STORY-012: Générer questions (Questioner)"
+      - "STORY-013: Afficher réponses (FicheLevee)"
+      - "STORY-014: Calcul run rate (PnLNormalizer)"
+      - "STORY-015: Comparer années (GLComparator)"
+      - "STORY-016: Bridge variation (VariationDrilldown)"
+      - "STORY-017: Rapport Excel (ExcelReporter)"
+      # Sprint 3 - Module IA
+      - "STORY-018: Benford (ai/benford.py)"
+      - "STORY-019: Isolation Forest (ai/isolation_forest.py)"
+      - "STORY-020: NLP Analyzer (ai/nlp_analyzer.py)"
+      - "STORY-021: Risk Scorer (ai/risk_scorer.py)"
 
 # Current workflow position
-current_phase: 4
-current_step: "implementation"
-next_recommended_action: "Sprint 2 - STORY-012 (Questions qualification)"
+current_phase: 5
+current_step: "testing_and_polish"
+next_recommended_action: "Tests d'intégration et documentation"
+
+# Notes
+notes: |
+  Projet très avancé (v2.1.0 -> v2.4.0)
+  Nouveaux modules ajoutés cette session:
+  - accounting_context.py: Référentiel PCG français
+  - profiler.py: Analyse statistique des données
+  - detector.py: Détection concentrations et montants ronds
+  - regularization.py: Analyse journaux OD et régularisations
+  - analyzer.py: Orchestration de tous les composants
+  - .github/workflows/ci.yml: CI GitHub Actions
