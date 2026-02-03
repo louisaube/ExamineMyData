@@ -1,11 +1,25 @@
 # GL Normalizer
 
 ## Overview
-GL Normalizer is a Python library for analyzing and normalizing P&L (Profit & Loss) statements. It helps identify and neutralize accounting artifacts like unjustified provisions and inflated/deflated budgets to calculate the true operational run rate.
+GL Normalizer is a web application for analyzing and normalizing P&L (Profit & Loss) statements. It helps identify and neutralize accounting artifacts like unjustified provisions and inflated/deflated budgets to calculate the true operational run rate.
+
+## Running the Application
+The web application runs on port 5000 using FastAPI + Uvicorn:
+```bash
+python main.py
+```
 
 ## Project Structure
 ```
-gl_normalizer/
+main.py                  # FastAPI web application
+templates/               # Jinja2 HTML templates
+  ├── base.html          # Base layout
+  ├── upload.html        # File upload form
+  └── results.html       # Analysis results dashboard
+static/
+  └── style.css          # Application styles
+
+gl_normalizer/           # Core Python library
 ├── __init__.py          # Public API exports
 ├── config.py            # Configuration classes
 ├── loader.py            # GL data loading (multi-format support)
@@ -36,35 +50,28 @@ tests/                   # Test suite
 ```
 
 ## Key Dependencies
+- fastapi, uvicorn, jinja2 - Web framework
 - pandas, numpy - Data manipulation
 - openpyxl - Excel file handling
 - scipy, scikit-learn - Statistical analysis
-- Optional: xgboost, torch, sentence-transformers - AI features
+- xgboost - AI features
 
-## Usage
-This is a Python library. Import and use programmatically:
+## Web Application Features
+1. Upload Excel files (GL data)
+2. Single-year analysis or year-over-year comparison
+3. Dashboard showing run rate, anomalies, and regularizations
+4. Excel report download
 
-```python
-from gl_normalizer import compare_years, generate_excel_report
-
-# Compare two years
-comparison = compare_years("GL_2024.xlsx", "GL_2025.xlsx")
-print(f"Accounting variation: {comparison.variation_brute:,.0f}€")
-print(f"Run rate variation: {comparison.variation_normalisee:,.0f}€")
-
-# Generate Excel report
-generate_excel_report(comparison, "analysis_report.xlsx")
-```
-
-## Running Tests
-```bash
-python -m pytest tests/ -v
-```
+## API Endpoints
+- `GET /` - Upload form
+- `POST /analyze` - Run analysis on uploaded files
+- `GET /results/{job_id}` - View analysis results
+- `GET /report/{job_id}` - Download Excel report
 
 ## Supported Formats
 - Sage, Cegid, Quadratus, EBP
 - Generic Excel exports
 
 ## Requirements
-- Python 3.9+
+- Python 3.12+
 - Monthly accounting data (required for pattern analysis)
