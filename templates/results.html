@@ -8,7 +8,7 @@
         <h2>Résultats de l'analyse</h2>
         <a href="/report/{{ job_id }}" class="btn btn-secondary">Télécharger le rapport Excel</a>
     </div>
-    
+
     {% if type == "comparison" %}
     <div class="summary-cards">
         <div class="card">
@@ -16,53 +16,110 @@
             <p class="big-number">{{ "{:,.0f}".format(total_n1) }} €</p>
             <small>Total charges</small>
         </div>
-        
+
         <div class="card">
             <h3>Année {{ year1 }}</h3>
             <p class="big-number">{{ "{:,.0f}".format(total_n) }} €</p>
             <small>Total charges</small>
         </div>
-        
+
         <div class="card {% if variation_brute > 0 %}card-warning{% else %}card-success{% endif %}">
             <h3>Variation comptable</h3>
             <p class="big-number">{{ "{:+,.0f}".format(variation_brute) }} €</p>
             <small>Brute</small>
         </div>
-        
+
         <div class="card {% if variation_normalisee > 0 %}card-warning{% else %}card-success{% endif %}">
             <h3>Variation run rate</h3>
             <p class="big-number">{{ "{:+,.0f}".format(variation_normalisee) }} €</p>
             <small>Normalisée</small>
         </div>
     </div>
-    
+
     <div class="impact-section">
         <h3>Impact des provisions</h3>
         <p class="impact-value">{{ "{:+,.0f}".format(ecart) }} €</p>
         <p>Écart entre la variation comptable et le run rate réel</p>
     </div>
-    
+
     {% else %}
-    
+
+    <!-- Cartes de synthèse principales -->
     <div class="summary-cards">
         <div class="card">
             <h3>Année analysée</h3>
             <p class="big-number">{{ year }}</p>
         </div>
-        
+
         <div class="card">
             <h3>Écritures</h3>
             <p class="big-number">{{ "{:,}".format(total_entries) }}</p>
+            <small>{{ "{:,}".format(account_count) }} comptes</small>
         </div>
-        
+
         {% if run_rate %}
         <div class="card">
             <h3>Run Rate mensuel</h3>
             <p class="big-number">{{ "{:,.0f}".format(run_rate.run_rate_mensuel) }} €</p>
+            <small>Charges normalisées</small>
+        </div>
+
+        <div class="card">
+            <h3>Charges annuelles</h3>
+            <p class="big-number">{{ "{:,.0f}".format(run_rate.charges_brutes) }} €</p>
+            <small>Total brut</small>
         </div>
         {% endif %}
     </div>
-    
+
+    <!-- Indicateurs de risque et qualité -->
+    <div class="metrics-row">
+        <div class="metric-box {% if overall_risk_score > 0.7 %}metric-danger{% elif overall_risk_score > 0.4 %}metric-warning{% else %}metric-success{% endif %}">
+            <span class="metric-label">Score de risque</span>
+            <span class="metric-value">{{ "{:.0%}".format(overall_risk_score) }}</span>
+        </div>
+
+        <div class="metric-box {% if data_quality == 'excellent' or data_quality == 'good' %}metric-success{% elif data_quality == 'acceptable' %}metric-warning{% else %}metric-danger{% endif %}">
+            <span class="metric-label">Qualité données</span>
+            <span class="metric-value">{{ data_quality|capitalize }}</span>
+        </div>
+
+        <div class="metric-box">
+            <span class="metric-label">Anomalies</span>
+            <span class="metric-value">{{ anomalies|length }}</span>
+        </div>
+
+        <div class="metric-box">
+            <span class="metric-label">Régularisations</span>
+            <span class="metric-value">{{ regularizations|length }}</span>
+        </div>
+    </div>
+
+    <!-- Warnings -->
+    {% if warnings %}
+    <div class="warnings-section">
+        <h3>Points d'attention</h3>
+        <ul class="warnings-list">
+            {% for warning in warnings %}
+            <li class="warning-item">{{ warning }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Recommandations -->
+    {% if recommendations %}
+    <div class="recommendations-section">
+        <h3>Recommandations</h3>
+        <ul class="recommendations-list">
+            {% for rec in recommendations %}
+            <li class="rec-item">{{ rec }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Anomalies détaillées -->
     {% if anomalies %}
     <div class="anomalies-section">
         <h3>Anomalies détectées ({{ anomalies|length }})</h3>
@@ -70,55 +127,216 @@
             <thead>
                 <tr>
                     <th>Compte</th>
+                    <th>Type</th>
                     <th>Catégorie</th>
-                    <th>Score</th>
-                    <th>Description</th>
+                    <th>Sévérité</th>
+                    <th>Montant</th>
+                    <th>Détails</th>
+                    <th>Contexte PCG</th>
                 </tr>
             </thead>
             <tbody>
                 {% for anomaly in anomalies %}
-                <tr>
-                    <td>{{ anomaly.compte if anomaly.compte else '-' }}</td>
-                    <td>{{ anomaly.category.value if anomaly.category else '-' }}</td>
-                    <td>{{ "{:.2f}".format(anomaly.score) if anomaly.score else '-' }}</td>
-                    <td>{{ anomaly.description if anomaly.description else '-' }}</td>
+                <tr class="severity-{{ anomaly.severity }}">
+                    <td><strong>{{ anomaly.compte if anomaly.compte else '-' }}</strong></td>
+                    <td>{{ anomaly.anomaly_type if anomaly.anomaly_type else '-' }}</td>
+                    <td>
+                        <span class="badge badge-{{ 'success' if anomaly.is_expected else 'warning' }}">
+                            {{ anomaly.category.value if anomaly.category else '-' }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="severity-badge severity-{{ anomaly.severity }}">
+                            {{ anomaly.severity|capitalize if anomaly.severity else '-' }}
+                        </span>
+                    </td>
+                    <td class="amount">{{ "{:,.0f}".format(anomaly.montant) if anomaly.montant else '-' }} €</td>
+                    <td>{{ anomaly.details if anomaly.details else '-' }}</td>
+                    <td><small>{{ anomaly.pcg_context if anomaly.pcg_context else '-' }}</small></td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
     {% endif %}
-    
+
+    <!-- Régularisations -->
     {% if regularizations %}
     <div class="regularizations-section">
-        <h3>Régularisations détectées</h3>
+        <h3>Régularisations détectées ({{ regularizations|length }})</h3>
         <table class="data-table">
             <thead>
                 <tr>
                     <th>Type</th>
                     <th>Journal</th>
                     <th>Compte</th>
+                    <th>Libellé</th>
                     <th>Montant</th>
+                    <th>Confiance</th>
                 </tr>
             </thead>
             <tbody>
                 {% for reg in regularizations %}
                 <tr>
-                    <td>{{ reg.type.value if reg.type else '-' }}</td>
+                    <td>
+                        <span class="badge badge-info">
+                            {{ reg.type.value if reg.type else '-' }}
+                        </span>
+                    </td>
                     <td>{{ reg.journal if reg.journal else '-' }}</td>
-                    <td>{{ reg.compte if reg.compte else '-' }}</td>
-                    <td>{{ "{:,.0f}".format(reg.montant) if reg.montant else '-' }} €</td>
+                    <td><strong>{{ reg.compte if reg.compte else '-' }}</strong></td>
+                    <td>{{ reg.libelle_compte if reg.libelle_compte else (reg.libelle if reg.libelle else '-') }}</td>
+                    <td class="amount">{{ "{:,.0f}".format(reg.montant) if reg.montant else '-' }} €</td>
+                    <td>
+                        {% if reg.confidence %}
+                        <span class="confidence-bar" style="--conf: {{ (reg.confidence * 100)|int }}%">
+                            {{ "{:.0%}".format(reg.confidence) }}
+                        </span>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
     {% endif %}
-    
+
     {% endif %}
-    
+
     <div class="actions">
         <a href="/" class="btn btn-primary">Nouvelle analyse</a>
     </div>
 </div>
+
+<style>
+/* Métriques compactes */
+.metrics-row {
+    display: flex;
+    gap: 1rem;
+    margin: 1.5rem 0;
+    flex-wrap: wrap;
+}
+
+.metric-box {
+    flex: 1;
+    min-width: 120px;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-align: center;
+    border-left: 4px solid #6c757d;
+}
+
+.metric-box.metric-success { border-left-color: #28a745; background: #d4edda; }
+.metric-box.metric-warning { border-left-color: #ffc107; background: #fff3cd; }
+.metric-box.metric-danger { border-left-color: #dc3545; background: #f8d7da; }
+
+.metric-label {
+    display: block;
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 0.25rem;
+}
+
+.metric-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+/* Warnings et recommandations */
+.warnings-section, .recommendations-section {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.warnings-section {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+}
+
+.recommendations-section {
+    background: #cce5ff;
+    border-left: 4px solid #007bff;
+}
+
+.warnings-list, .recommendations-list {
+    margin: 0.5rem 0 0 1.5rem;
+    padding: 0;
+}
+
+.warning-item, .rec-item {
+    margin: 0.5rem 0;
+}
+
+/* Sévérité */
+.severity-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.severity-badge.severity-critical { background: #dc3545; color: white; }
+.severity-badge.severity-high { background: #fd7e14; color: white; }
+.severity-badge.severity-medium { background: #ffc107; color: black; }
+.severity-badge.severity-low { background: #28a745; color: white; }
+
+tr.severity-critical { background: #f8d7da; }
+tr.severity-high { background: #ffe5d0; }
+
+/* Badges */
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.badge-success { background: #28a745; color: white; }
+.badge-warning { background: #ffc107; color: black; }
+.badge-info { background: #17a2b8; color: white; }
+
+/* Montants */
+.amount {
+    text-align: right;
+    font-family: monospace;
+    white-space: nowrap;
+}
+
+/* Confiance */
+.confidence-bar {
+    display: inline-block;
+    background: linear-gradient(90deg, #28a745 var(--conf), #e9ecef var(--conf));
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+/* Table améliorée */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+}
+
+.data-table th {
+    background: #343a40;
+    color: white;
+    padding: 0.75rem;
+    text-align: left;
+}
+
+.data-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.data-table tbody tr:hover {
+    background: #f1f3f5;
+}
+</style>
 {% endblock %}

@@ -91,10 +91,33 @@ phase_4_implementation:
       - "STORY-025: STL Decomposition saisonnalité [NEW]"
       - "STORY-026: Clustering comportemental comptes [NEW]"
 
+# Sprint 6 - UX & Performance (NEW)
+sprint_6_backlog:
+  status: "in_progress"
+  stories:
+    - id: "STORY-027"
+      title: "Configuration UI tokens API"
+      file: "docs/stories/STORY-027-ui-token-configuration.md"
+      status: "pending"
+      priority: "high"
+      points: 3
+    - id: "STORY-028"
+      title: "Migration Polars performance"
+      file: "docs/stories/STORY-028-polars-migration.md"
+      status: "pending"
+      priority: "medium"
+      points: 8
+    - id: "STORY-029"
+      title: "Amélioration affichage résultats"
+      status: "completed"
+      priority: "high"
+      points: 2
+      notes: "Corrigé bugs affichage, ajouté traitement async"
+
 # Current workflow position
-current_phase: 5
-current_step: "completed"
-next_recommended_action: "Documentation utilisateur"
+current_phase: 4
+current_step: "sprint_6"
+next_recommended_action: "Implémenter STORY-027 (tokens UI)"
 
 # Notes
 notes: |
