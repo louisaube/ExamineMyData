@@ -58,7 +58,7 @@ Usage avancé:
     print(drilldown.format_drilldown_report(analysis))
 """
 
-__version__ = "2.1.0"
+__version__ = "2.6.0"
 __author__ = "GL Normalizer Team"
 
 # API publique principale
@@ -120,6 +120,73 @@ from .security import (
     check_dataframe_limits,
     validate_file_extension,
     get_limits_summary,
+)
+from .accounting_context import (
+    AccountingContext,
+    AccountClassification,
+    ExpectedBehavior,
+    ChargeFrequency,
+    AccountBehavior,
+    get_pcg_context,
+)
+from .profiler import (
+    Profiler,
+    ColumnProfile,
+    AccountProfile,
+    BaselineProfile,
+    DataProfileResult,
+    profile_gl,
+)
+from .detector import (
+    AnomalyDetector,
+    ConcentrationDetector,
+    RoundAmountDetector,
+    ConcentrationAnomaly,
+    RoundAmountAnomaly,
+    DetectionResult,
+    detect_anomalies,
+)
+from .regularization import (
+    RegularizationDetector,
+    RegularizationEntry,
+    RegularizationAnalysis,
+    RegularizationType,
+    JournalType,
+    JournalAnalysisResult,
+    detect_regularizations,
+)
+from .analyzer import (
+    GLAnalyzer,
+    FullAnalysisResult,
+    RunRateResult,
+    ContextualizedAnomaly,
+    AnomalyCategory,
+    analyze_gl,
+)
+from .secrets_manager import (
+    SecretsManager,
+    SecretType,
+    SecretValidation,
+    get_secrets_manager,
+    get_api_key,
+    setup_secrets,
+    check_ai_ready,
+)
+from .advanced_stats import (
+    MADDetector,
+    MADResult,
+    IQRDetector,
+    IQRResult,
+    SeasonalDecomposer,
+    SeasonalityResult,
+    SeasonalPattern,
+    AccountClusterer,
+    ClusterResult,
+    ClusteringSummary,
+    AccountBehaviorCluster,
+    detect_anomalies_robust,
+    analyze_seasonality,
+    cluster_accounts,
 )
 
 # Exports publics
@@ -186,6 +253,66 @@ __all__ = [
     "check_dataframe_limits",
     "validate_file_extension",
     "get_limits_summary",
+    # Accounting Context (PCG)
+    "AccountingContext",
+    "AccountClassification",
+    "ExpectedBehavior",
+    "ChargeFrequency",
+    "AccountBehavior",
+    "get_pcg_context",
+    # Profiler
+    "Profiler",
+    "ColumnProfile",
+    "AccountProfile",
+    "BaselineProfile",
+    "DataProfileResult",
+    "profile_gl",
+    # Detector
+    "AnomalyDetector",
+    "ConcentrationDetector",
+    "RoundAmountDetector",
+    "ConcentrationAnomaly",
+    "RoundAmountAnomaly",
+    "DetectionResult",
+    "detect_anomalies",
+    # Regularization
+    "RegularizationDetector",
+    "RegularizationEntry",
+    "RegularizationAnalysis",
+    "RegularizationType",
+    "JournalType",
+    "JournalAnalysisResult",
+    "detect_regularizations",
+    # Analyzer
+    "GLAnalyzer",
+    "FullAnalysisResult",
+    "RunRateResult",
+    "ContextualizedAnomaly",
+    "AnomalyCategory",
+    "analyze_gl",
+    # Secrets Manager
+    "SecretsManager",
+    "SecretType",
+    "SecretValidation",
+    "get_secrets_manager",
+    "get_api_key",
+    "setup_secrets",
+    "check_ai_ready",
+    # Advanced Stats
+    "MADDetector",
+    "MADResult",
+    "IQRDetector",
+    "IQRResult",
+    "SeasonalDecomposer",
+    "SeasonalityResult",
+    "SeasonalPattern",
+    "AccountClusterer",
+    "ClusterResult",
+    "ClusteringSummary",
+    "AccountBehaviorCluster",
+    "detect_anomalies_robust",
+    "analyze_seasonality",
+    "cluster_accounts",
     # AI Module
     "ai",
 ]

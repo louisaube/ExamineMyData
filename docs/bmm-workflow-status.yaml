@@ -1,103 +1,123 @@
-# BMAD Method Workflow Status
+# BMAD Method v6 - Workflow Status
+# Project: ExamineMyData
+# Level: 2 (Medium feature set)
 # Generated: 2026-02-02
-# Project: GL Normalizer
 
-project_name: "GL Normalizer"
-project_type: "library"
-project_level: 2
-communication_language: "French"
-output_language: "French"
-last_updated: "2026-02-02"
+metadata:
+  project_name: "ExamineMyData"
+  project_type: "web-app"
+  project_level: 2
+  initialized_at: "2026-02-02T14:50:00Z"
+  last_updated: "2026-02-03T16:00:00Z"
 
-# Description du projet
-project_description: |
-  Outil d'analyse du Grand Livre (GL) qui dépollue le P&L des artefacts
-  comptables (provisions injustifiées, enveloppes gonflées/dégonflées)
-  pour calculer le run rate réel de l'entreprise.
+# Phase 1: Discovery
+phase_1_discovery:
+  product_brief:
+    status: "completed"
+    requirement: "recommended"
+    file: "docs/product-brief-examinedata-2026-02-02.md"
+    completed_at: "2026-02-02T15:00:00Z"
 
-# Modules existants
-existing_modules:
-  - name: "Core Analysis"
-    files: ["loader.py", "classifier.py", "pnl_normalizer.py"]
-    status: "implemented"
-  - name: "Content Analyzer"
-    files: ["content_analyzer.py", "drilldown.py"]
-    status: "implemented"
-  - name: "AI Module"
-    files: ["ai/benford.py", "ai/isolation_forest.py", "ai/autoencoder.py", "ai/nlp_analyzer.py", "ai/xgboost_scorer.py", "ai/risk_scorer.py"]
-    status: "implemented"
-  - name: "Reporting"
-    files: ["reporter.py", "comparator.py"]
-    status: "implemented"
-  - name: "Questioner"
-    files: ["questioner.py"]
-    status: "implemented"
-  - name: "Security"
-    files: ["security.py"]
-    status: "implemented"
+# Phase 2: Requirements
+phase_2_requirements:
+  prd:
+    status: "completed"
+    requirement: "required"  # Level 2+ requires PRD
+    file: "docs/prd-gl-normalizer-2026-02-03.md"
+    completed_at: "2026-02-03T10:00:00Z"
+  tech_spec:
+    status: "not_started"
+    requirement: "optional"  # Level 2+ makes tech-spec optional
+    file: null
+    completed_at: null
 
-# Workflow Status Tracking
-# Status values:
-#   - "required" - Must be completed
-#   - "optional" - Can be skipped
-#   - "recommended" - Strongly suggested
-#   - "conditional" - Required based on project level
-#   - "{file-path}" - Completed (path to output file)
-#   - "skipped" - Explicitly skipped
+# Phase 3: Architecture
+phase_3_architecture:
+  architecture:
+    status: "completed"
+    requirement: "required"  # Level 2+ requires architecture
+    file: "docs/architecture-gl-normalizer-2026-02-03.md"
+    completed_at: "2026-02-03T11:00:00Z"
+  solutioning_gate:
+    status: "not_started"
+    requirement: "recommended"
+    passed: false
+    completed_at: null
 
-workflow_status:
-  # Phase 1: Analysis (Optional but recommended)
-  - name: product-brief
-    phase: 1
-    status: "optional"
-    description: "Create comprehensive product brief"
-    note: "Le README.md existant couvre partiellement ce besoin"
+# Phase 4: Implementation
+phase_4_implementation:
+  sprint_planning:
+    status: "completed"
+    requirement: "required"
+    file: "docs/sprint-plan-gl-normalizer-2026-02-03.md"
+    current_sprint: 1
+    total_sprints: 3
+  stories:
+    total: 27
+    completed: 27
+    in_progress: 0
+    pending: 0
+    completed_stories:
+      # Sprint 1 - Fondations
+      - "STORY-000: Setup projet (CI GitHub Actions) [NEW]"
+      - "STORY-001: Charger fichier Excel (GLLoader)"
+      - "STORY-002: Détecter format automatiquement (HeaderValidator)"
+      - "STORY-003: Mapping manuel colonnes (custom_mapping)"
+      - "STORY-004: Détection concentrations [NEW]"
+      - "STORY-005: Calcul Z-scores (detect_anomalies)"
+      - "STORY-006: Identifier provisions (PnLNormalizer)"
+      - "STORY-007: Montants ronds [NEW]"
+      - "STORY-008: Analyser journaux OD [NEW]"
+      - "STORY-009: AccountingContext PCG [NEW]"
+      - "STORY-010: Profiler stats [NEW]"
+      - "STORY-011: Contextualiser anomalies PCG [NEW]"
+      # Sprint 2 - MVP
+      - "STORY-012: Générer questions (Questioner)"
+      - "STORY-013: Afficher réponses (FicheLevee)"
+      - "STORY-014: Calcul run rate (PnLNormalizer)"
+      - "STORY-015: Comparer années (GLComparator)"
+      - "STORY-016: Bridge variation (VariationDrilldown)"
+      - "STORY-017: Rapport Excel (ExcelReporter)"
+      # Sprint 3 - Module IA
+      - "STORY-018: Benford (ai/benford.py)"
+      - "STORY-019: Isolation Forest (ai/isolation_forest.py)"
+      - "STORY-020: NLP Analyzer (ai/nlp_analyzer.py)"
+      - "STORY-021: Risk Scorer (ai/risk_scorer.py)"
+      # Sprint 4 - Sécurité (NEW)
+      - "STORY-022: Gestion sécurisée tokens API [NEW]"
+      - "STORY-023: Protection secrets .gitignore [NEW]"
+      # Sprint 5 - Algorithmes avancés (NEW)
+      - "STORY-024: MAD + IQR adaptatif (advanced_stats.py) [NEW]"
+      - "STORY-025: STL Decomposition saisonnalité [NEW]"
+      - "STORY-026: Clustering comportemental comptes [NEW]"
 
-  - name: brainstorm-project
-    phase: 1
-    status: "optional"
-    description: "Structured brainstorming session"
+# Current workflow position
+current_phase: 5
+current_step: "completed"
+next_recommended_action: "Documentation utilisateur"
 
-  - name: research
-    phase: 1
-    status: "optional"
-    description: "Market and competitive research"
+# Notes
+notes: |
+  Projet complet (v2.1.0 -> v2.6.0)
 
-  # Phase 2: Planning (Required - choose one based on project level)
-  - name: prd
-    phase: 2
-    status: "required"  # required for level 2+
-    description: "Product Requirements Document"
-    note: "À créer pour documenter les exigences détaillées"
+  Session 1 - Nouveaux modules:
+  - accounting_context.py: Référentiel PCG français
+  - profiler.py: Analyse statistique des données
+  - detector.py: Détection concentrations et montants ronds
+  - regularization.py: Analyse journaux OD et régularisations
+  - analyzer.py: Orchestration de tous les composants
+  - .github/workflows/ci.yml: CI GitHub Actions
 
-  - name: tech-spec
-    phase: 2
-    status: "optional"  # optional for level 2+
-    description: "Technical Specification"
+  Session 2 - Sécurité:
+  - secrets_manager.py: Gestion sécurisée des tokens API
+  - .gitignore: Protection des fichiers sensibles
+  - Chiffrement local des secrets
+  - Validation des formats de tokens
 
-  - name: create-ux-design
-    phase: 2
-    status: "optional"
-    description: "UX/UI design workflow"
-    note: "N/A - Library sans interface utilisateur"
-
-  # Phase 3: Solutioning (Conditional on project level)
-  - name: architecture
-    phase: 3
-    status: "required"  # required for level 2+
-    description: "System architecture design"
-    note: "À documenter - architecture existante à formaliser"
-
-  - name: solutioning-gate-check
-    phase: 3
-    status: "optional"
-    description: "Validate architecture against requirements"
-
-  # Phase 4: Implementation (Required)
-  # Note: Implementation tracked in sprint-status.yaml
-
-# Prochaines étapes recommandées
-next_steps:
-  - "Créer le PRD pour formaliser les exigences"
-  - "Documenter l'architecture existante"
-  - "Planifier le sprint pour les améliorations"
+  Session 3 - Algorithmes avancés:
+  - advanced_stats.py: Méthodes statistiques robustes
+    - MADDetector: Median Absolute Deviation (robuste aux outliers)
+    - IQRDetector: Interquartile Range (méthode Tukey)
+    - SeasonalDecomposer: Décomposition saisonnière STL simplifié
+    - AccountClusterer: Clustering comportemental des comptes
+  - 24 tests unitaires + intégration

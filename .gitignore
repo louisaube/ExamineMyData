@@ -70,5 +70,22 @@ Thumbs.db
 # Logs
 *.log
 
-# BMAD skills (installed separately)
-claude-code-bmad-skills/
+# Secrets and sensitive files - NEVER COMMIT
+.gl_normalizer_secrets
+.env
+.env.*
+*.env
+secrets.json
+secrets.yaml
+secrets.yml
+*_secrets*
+*.pem
+*.key
+credentials.json
+token.json
+api_keys.json
+
+# Config with potential secrets
+config.local.yaml
+config.local.json
+.secrets/
