@@ -58,7 +58,7 @@ Usage avancé:
     print(drilldown.format_drilldown_report(analysis))
 """
 
-__version__ = "2.2.0"
+__version__ = "2.4.0"
 __author__ = "GL Normalizer Team"
 
 # API publique principale
@@ -145,6 +145,23 @@ from .detector import (
     RoundAmountAnomaly,
     DetectionResult,
     detect_anomalies,
+)
+from .regularization import (
+    RegularizationDetector,
+    RegularizationEntry,
+    RegularizationAnalysis,
+    RegularizationType,
+    JournalType,
+    JournalAnalysisResult,
+    detect_regularizations,
+)
+from .analyzer import (
+    GLAnalyzer,
+    FullAnalysisResult,
+    RunRateResult,
+    ContextualizedAnomaly,
+    AnomalyCategory,
+    analyze_gl,
 )
 
 # Exports publics
@@ -233,6 +250,21 @@ __all__ = [
     "RoundAmountAnomaly",
     "DetectionResult",
     "detect_anomalies",
+    # Regularization
+    "RegularizationDetector",
+    "RegularizationEntry",
+    "RegularizationAnalysis",
+    "RegularizationType",
+    "JournalType",
+    "JournalAnalysisResult",
+    "detect_regularizations",
+    # Analyzer
+    "GLAnalyzer",
+    "FullAnalysisResult",
+    "RunRateResult",
+    "ContextualizedAnomaly",
+    "AnomalyCategory",
+    "analyze_gl",
     # AI Module
     "ai",
 ]

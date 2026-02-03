@@ -54,9 +54,9 @@ phase_4_implementation:
     total_sprints: 3
   stories:
     total: 22
-    completed: 7
+    completed: 12
     in_progress: 0
-    pending: 15
+    pending: 10
     completed_stories:
       - "STORY-000: Setup projet (CI GitHub Actions)"
       - "STORY-001: Charger fichier Excel (déjà existant)"
@@ -64,11 +64,14 @@ phase_4_implementation:
       - "STORY-003: Mapping manuel colonnes (déjà existant)"
       - "STORY-004: Détection concentrations"
       - "STORY-005: Calcul Z-scores (déjà existant)"
+      - "STORY-006: Identifier provisions (enrichi PCG)"
       - "STORY-007: Montants ronds"
+      - "STORY-008: Analyser journaux OD (régularisations)"
       - "STORY-009: AccountingContext (PCG)"
       - "STORY-010: Profiler (stats)"
+      - "STORY-011: Contextualiser anomalies PCG"
 
 # Current workflow position
 current_phase: 4
 current_step: "implementation"
-next_recommended_action: "/dev-story STORY-006"
+next_recommended_action: "Sprint 2 - STORY-012 (Questions qualification)"
