@@ -1,0 +1,809 @@
+# Sprint Plan: GL Normalizer
+
+**Date:** 2026-02-03
+**Project:** ExamineMyData (GL Normalizer)
+**Level:** 2 (Medium feature set)
+**Total Stories:** 22
+**Total Points:** 78
+**Planned Sprints:** 3
+**Target Completion:** Q1 2026
+
+---
+
+## Executive Summary
+
+Plan d'implémentation de GL Normalizer en **3 sprints de 2 semaines** (~6 semaines total).
+
+- **Sprint 1** : Fondations (Import, Contexte PCG, Détection base)
+- **Sprint 2** : MVP complet (Détection avancée, Qualification, Run Rate, Rapport)
+- **Sprint 3** : Module IA optionnel + Polish
+
+**Key Metrics:**
+
+| Métrique | Valeur |
+|----------|--------|
+| Total Stories | 22 |
+| Total Points | 78 |
+| Sprints | 3 |
+| Team | 1 dev + IA (vibecoding) |
+| Capacité/Sprint | ~30-35 points |
+| MVP | Fin Sprint 2 |
+
+---
+
+## Team Capacity
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Développeurs | 1 + IA assistance |
+| Sprint length | 2 semaines |
+| Heures productives/jour | 5h |
+| Total heures/sprint | 50h |
+| Vélocité estimée | 30-35 points/sprint |
+
+---
+
+## Story Inventory
+
+### STORY-000: Setup projet
+
+**Epic:** Infrastructure
+**Priority:** Must Have
+**Points:** 3
+
+**User Story:**
+En tant que développeur,
+Je veux un projet Python structuré avec CI/CD,
+Afin de commencer le développement sur des bases solides.
+
+**Acceptance Criteria:**
+- [ ] Structure de projet créée (gl_normalizer/)
+- [ ] pyproject.toml configuré
+- [ ] requirements.txt avec dépendances
+- [ ] GitHub Actions pour tests
+- [ ] README avec instructions d'installation
+- [ ] .gitignore configuré
+
+**Technical Notes:**
+- Structure selon architecture doc
+- pytest configuré
+- black + flake8 configurés
+
+---
+
+### STORY-001: Charger fichier Excel
+
+**Epic:** EPIC-001 Import & Parsing GL
+**Priority:** Must Have
+**Points:** 3
+**FR:** FR-001
+
+**User Story:**
+En tant que DAF,
+Je veux charger un export GL au format Excel,
+Afin de commencer l'analyse de mes données.
+
+**Acceptance Criteria:**
+- [ ] Supporte .xlsx et .xls
+- [ ] Gère fichiers jusqu'à 100k lignes
+- [ ] Message d'erreur clair si fichier invalide
+- [ ] Chargement < 30 secondes pour 50k lignes
+- [ ] Retourne un DataFrame pandas
+
+**Technical Notes:**
+- Utiliser openpyxl pour .xlsx
+- xlrd pour .xls (si nécessaire)
+- read_only mode pour performance
+
+**Dependencies:** STORY-000
+
+---
+
+### STORY-002: Détecter format automatiquement
+
+**Epic:** EPIC-001 Import & Parsing GL
+**Priority:** Should Have
+**Points:** 5
+**FR:** FR-002
+
+**User Story:**
+En tant que DAF,
+Je veux que l'outil détecte automatiquement le format de mon GL,
+Afin de ne pas avoir à configurer manuellement.
+
+**Acceptance Criteria:**
+- [ ] Détecte Sage, Cegid, Quadratus, EBP
+- [ ] Analyse les en-têtes de colonnes
+- [ ] Affiche le format détecté
+- [ ] Propose confirmation à l'utilisateur
+- [ ] Fallback sur mapping manuel si non reconnu
+
+**Technical Notes:**
+- Patterns de colonnes par format dans formats_mapping.yaml
+- Score de confiance pour la détection
+
+**Dependencies:** STORY-001
+
+---
+
+### STORY-003: Mapping manuel des colonnes
+
+**Epic:** EPIC-001 Import & Parsing GL
+**Priority:** Must Have
+**Points:** 3
+**FR:** FR-003
+
+**User Story:**
+En tant que DAF avec un format GL non standard,
+Je veux mapper manuellement les colonnes,
+Afin d'utiliser l'outil malgré un format non reconnu.
+
+**Acceptance Criteria:**
+- [ ] Interface CLI pour mapper: compte, date, montant, libellé, journal
+- [ ] Validation des colonnes obligatoires
+- [ ] Sauvegarde du mapping pour réutilisation
+- [ ] Message d'erreur si colonnes manquantes
+
+**Technical Notes:**
+- Sauvegarder mapping dans config YAML
+- Proposer colonnes candidates
+
+**Dependencies:** STORY-001
+
+---
+
+### STORY-004: Détecter concentrations mensuelles
+
+**Epic:** EPIC-002 Moteur de Détection
+**Priority:** Must Have
+**Points:** 3
+**FR:** FR-004
+
+**User Story:**
+En tant que DAF,
+Je veux identifier les comptes avec concentration anormale sur un mois,
+Afin de repérer les provisions concentrées.
+
+**Acceptance Criteria:**
+- [ ] Calcule % mensuel par compte
+- [ ] Flagge si un mois > 50% du total annuel
+- [ ] Identifie particulièrement décembre
+- [ ] Retourne liste d'anomalies avec détails
+
+**Technical Notes:**
+- Seuil configurable (défaut: 50%)
+- Groupby compte + mois
+
+**Dependencies:** STORY-001
+
+---
+
+### STORY-005: Calculer Z-scores
+
+**Epic:** EPIC-002 Moteur de Détection
+**Priority:** Must Have
+**Points:** 3
+**FR:** FR-005
+
+**User Story:**
+En tant que DAF,
+Je veux identifier les mois statistiquement anormaux par compte,
+Afin de repérer les outliers.
+
+**Acceptance Criteria:**
+- [ ] Z-score calculé pour chaque compte/mois
+- [ ] Seuil configurable (défaut: |Z| > 2)
+- [ ] Liste des outliers triée par Z-score
+- [ ] Gère les comptes avec peu d'écritures
+
+**Technical Notes:**
+- scipy.stats.zscore ou calcul manuel
+- Exclure comptes avec < 3 mois d'activité
+
+**Dependencies:** STORY-001
+
+---
+
+### STORY-006: Identifier provisions
+
+**Epic:** EPIC-002 Moteur de Détection
+**Priority:** Must Have
+**Points:** 5
+**FR:** FR-006
+
+**User Story:**
+En tant que DAF,
+Je veux identifier automatiquement les écritures de provisions,
+Afin de les analyser spécifiquement.
+
+**Acceptance Criteria:**
+- [ ] Détecte mots-clés: "provision", "dotation", "reprise"
+- [ ] Identifie comptes classe 68x, 78x
+- [ ] Flagge journaux OD avec provisions
+- [ ] Calcule solde net provisions par compte
+
+**Technical Notes:**
+- Regex sur libellés
+- Classification par compte PCG
+- Utiliser AccountingContext
+
+**Dependencies:** STORY-001, STORY-009
+
+---
+
+### STORY-007: Détecter montants ronds
+
+**Epic:** EPIC-002 Moteur de Détection
+**Priority:** Should Have
+**Points:** 2
+**FR:** FR-007
+
+**User Story:**
+En tant que DAF,
+Je veux repérer les montants ronds suspects,
+Afin d'identifier des écritures potentiellement fabriquées.
+
+**Acceptance Criteria:**
+- [ ] Détecte multiples de 1000€ et 10000€
+- [ ] Croise avec journal OD
+- [ ] Score de suspicion combiné
+- [ ] Seuil configurable
+
+**Technical Notes:**
+- Modulo pour détection
+- Pondérer avec autres critères
+
+**Dependencies:** STORY-001
+
+---
+
+### STORY-008: Analyser journaux OD
+
+**Epic:** EPIC-002 Moteur de Détection
+**Priority:** Should Have
+**Points:** 3
+**FR:** FR-008
+
+**User Story:**
+En tant que DAF,
+Je veux analyser les journaux OD/situation,
+Afin de repérer les régularisations.
+
+**Acceptance Criteria:**
+- [ ] Identifie journaux OD par code
+- [ ] Calcule % d'écritures en décembre par journal
+- [ ] Flagge journaux avec >50% en décembre
+- [ ] Liste les écritures de régularisation
+
+**Technical Notes:**
+- Codes OD courants: OD, AN, RAN, SIT
+- Configurable via YAML
+
+**Dependencies:** STORY-001
+
+---
+
+### STORY-009: Implémenter AccountingContext (PCG)
+
+**Epic:** EPIC-002b Contexte & Profiling
+**Priority:** Must Have
+**Points:** 5
+**FR:** Nouveau
+
+**User Story:**
+En tant que DAF,
+Je veux que l'outil connaisse le PCG,
+Afin de contextualiser les anomalies selon le référentiel comptable.
+
+**Acceptance Criteria:**
+- [ ] Charger PCG français (comptes, libellés, classes)
+- [ ] Classifier un compte (classe, nature, type)
+- [ ] Définir comportement attendu par compte
+- [ ] Valider compte contre PCG
+- [ ] Supporter plan de compte personnalisé (optionnel)
+
+**Technical Notes:**
+- PCG en YAML (data/pcg_2025.yaml)
+- Comportements: mensuel, annuel, variable
+- Comptes 68x = provisions annuelles
+
+**Dependencies:** STORY-000
+
+---
+
+### STORY-010: Implémenter Profiler
+
+**Epic:** EPIC-002b Contexte & Profiling
+**Priority:** Must Have
+**Points:** 5
+**FR:** Nouveau
+
+**User Story:**
+En tant que DAF,
+Je veux un profil statistique de mes données GL,
+Afin de comprendre la structure de mes données.
+
+**Acceptance Criteria:**
+- [ ] Stats par colonne (type, null%, unique, distribution)
+- [ ] Profil par compte (total, nb écritures, volatilité)
+- [ ] Détection problèmes qualité données
+- [ ] Baseline pour comparaison
+
+**Technical Notes:**
+- pandas describe() enrichi
+- Calcul volatilité (std/mean)
+
+**Dependencies:** STORY-001
+
+---
+
+### STORY-011: Contextualiser anomalies PCG
+
+**Epic:** EPIC-002b Contexte & Profiling
+**Priority:** Must Have
+**Points:** 3
+**FR:** Nouveau
+
+**User Story:**
+En tant que DAF,
+Je veux que les anomalies soient contextualisées selon le PCG,
+Afin de distinguer les vraies anomalies des comportements normaux.
+
+**Acceptance Criteria:**
+- [ ] Compare comportement observé vs attendu (PCG)
+- [ ] Ajuste score si comportement attendu
+- [ ] Enrichit anomalie avec contexte PCG
+- [ ] Génère question suggérée
+
+**Technical Notes:**
+- Ex: compte 681 concentré en décembre = normal
+- Réduire score si comportement attendu
+
+**Dependencies:** STORY-009, STORY-004, STORY-005
+
+---
+
+### STORY-012: Questions qualificatives
+
+**Epic:** EPIC-003 Workflow Qualification
+**Priority:** Must Have
+**Points:** 3
+**FR:** FR-009
+
+**User Story:**
+En tant que DAF,
+Je veux répondre à des questions pour qualifier les anomalies,
+Afin de distinguer les vrais problèmes des faux positifs.
+
+**Acceptance Criteria:**
+- [ ] Sélectionne top 10 anomalies par impact
+- [ ] Question avec contexte (compte, montant, PCG)
+- [ ] Réponses: Justifié / Non justifié / À investiguer
+- [ ] Possibilité de skip
+
+**Technical Notes:**
+- CLI interactive
+- Afficher contexte PCG dans la question
+
+**Dependencies:** STORY-011
+
+---
+
+### STORY-013: Commentaires et justifications
+
+**Epic:** EPIC-003 Workflow Qualification
+**Priority:** Must Have
+**Points:** 2
+**FR:** FR-010
+
+**User Story:**
+En tant que DAF,
+Je veux ajouter un commentaire pour chaque anomalie qualifiée,
+Afin de documenter mes décisions.
+
+**Acceptance Criteria:**
+- [ ] Champ texte libre pour commentaire
+- [ ] Commentaire optionnel mais encouragé
+- [ ] Affichage dans le rapport final
+- [ ] Horodatage du commentaire
+
+**Technical Notes:**
+- input() en CLI
+- Stocker avec anomalie
+
+**Dependencies:** STORY-012
+
+---
+
+### STORY-014: Sauvegarde justifications YAML
+
+**Epic:** EPIC-003 Workflow Qualification
+**Priority:** Must Have
+**Points:** 3
+**FR:** FR-011
+
+**User Story:**
+En tant que DAF,
+Je veux que mes justifications soient sauvegardées,
+Afin de les réutiliser lors de la prochaine analyse.
+
+**Acceptance Criteria:**
+- [ ] Sauvegarde en YAML
+- [ ] Horodatage de chaque justification
+- [ ] Rechargement lors d'une nouvelle analyse
+- [ ] Export possible
+
+**Technical Notes:**
+- PyYAML
+- Fichier: justifications.yaml
+
+**Dependencies:** STORY-013
+
+---
+
+### STORY-015: Calculer run rate mensuel
+
+**Epic:** EPIC-004 Calcul Run Rate
+**Priority:** Must Have
+**Points:** 3
+**FR:** FR-012
+
+**User Story:**
+En tant que DAF,
+Je veux calculer le run rate mensuel de chaque compte,
+Afin d'avoir une vision lissée.
+
+**Acceptance Criteria:**
+- [ ] Run rate = Total annuel / 12
+- [ ] Calcul par compte et global
+- [ ] Comparaison avec P&L brut mensuel
+- [ ] Affichage de l'écart
+
+**Technical Notes:**
+- DataFrame avec colonnes mois + run_rate
+
+**Dependencies:** STORY-001
+
+---
+
+### STORY-016: Neutralisation par dispatch
+
+**Epic:** EPIC-004 Calcul Run Rate
+**Priority:** Must Have
+**Points:** 5
+**FR:** FR-013
+
+**User Story:**
+En tant que DAF,
+Je veux neutraliser les anomalies qualifiées,
+Afin d'obtenir un run rate dépollué.
+
+**Acceptance Criteria:**
+- [ ] Redistribution proportionnelle sur 12 mois
+- [ ] Option: dispatch sur période spécifique
+- [ ] Recalcul run rate après neutralisation
+- [ ] Traçabilité des neutralisations
+
+**Technical Notes:**
+- Créer colonne montant_ajusté
+- Garder montant_brut pour comparaison
+
+**Dependencies:** STORY-014, STORY-015
+
+---
+
+### STORY-017: Rapport Excel multi-onglets
+
+**Epic:** EPIC-005 Génération Rapport
+**Priority:** Must Have
+**Points:** 5
+**FR:** FR-014
+
+**User Story:**
+En tant que DAF,
+Je veux un rapport Excel complet,
+Afin d'analyser et partager les résultats.
+
+**Acceptance Criteria:**
+- [ ] Onglet "Anomalies" avec score, statut, commentaire
+- [ ] Onglet "Run Rate" avec comparatif mensuel
+- [ ] Onglet "Détail" avec écritures flaggées
+- [ ] Mise en forme conditionnelle (rouge/orange/vert)
+
+**Technical Notes:**
+- openpyxl pour génération
+- Styles et couleurs
+
+**Dependencies:** STORY-016
+
+---
+
+### STORY-018: Comparatif Run Rate vs Brut
+
+**Epic:** EPIC-005 Génération Rapport
+**Priority:** Must Have
+**Points:** 3
+**FR:** FR-015
+
+**User Story:**
+En tant que DAF,
+Je veux voir clairement l'écart entre run rate et P&L brut,
+Afin de mesurer l'impact des anomalies.
+
+**Acceptance Criteria:**
+- [ ] Tableau comparatif mois par mois
+- [ ] Écart en valeur absolue et %
+- [ ] Synthèse annuelle
+- [ ] Graphique si possible
+
+**Technical Notes:**
+- Dans onglet "Run Rate" du rapport
+
+**Dependencies:** STORY-017
+
+---
+
+### STORY-019: Analyse Benford (IA)
+
+**Epic:** EPIC-006 Module IA
+**Priority:** Could Have
+**Points:** 3
+**FR:** FR-016
+
+**User Story:**
+En tant que DAF,
+Je veux détecter les montants potentiellement fabriqués,
+Afin d'identifier des fraudes potentielles.
+
+**Acceptance Criteria:**
+- [ ] Analyse distribution premier chiffre
+- [ ] Comparaison avec distribution théorique Benford
+- [ ] Score d'anomalie Benford
+- [ ] Visualisation de la distribution
+
+**Technical Notes:**
+- scipy pour chi-square test
+- Seuil de significativité
+
+**Dependencies:** STORY-001
+
+---
+
+### STORY-020: Isolation Forest (IA)
+
+**Epic:** EPIC-006 Module IA
+**Priority:** Could Have
+**Points:** 5
+**FR:** FR-017
+
+**User Story:**
+En tant que DAF,
+Je veux détecter des anomalies non supervisées,
+Afin d'identifier des patterns suspects non prévus.
+
+**Acceptance Criteria:**
+- [ ] Entraînement sur features numériques
+- [ ] Score d'anomalie par écriture
+- [ ] Seuil configurable
+- [ ] Top N anomalies
+
+**Technical Notes:**
+- scikit-learn IsolationForest
+- Features: montant, mois, compte (encodé)
+
+**Dependencies:** STORY-001
+
+---
+
+### STORY-021: Analyse NLP libellés (IA)
+
+**Epic:** EPIC-006 Module IA
+**Priority:** Could Have
+**Points:** 5
+**FR:** FR-018
+
+**User Story:**
+En tant que DAF,
+Je veux analyser les libellés suspects,
+Afin de détecter des patterns de fraude.
+
+**Acceptance Criteria:**
+- [ ] Tokenization des libellés
+- [ ] Détection mots-clés suspects
+- [ ] Clustering de libellés similaires
+- [ ] Score de suspicion NLP
+
+**Technical Notes:**
+- spaCy ou regex avancé
+- Liste de mots suspects configurable
+
+**Dependencies:** STORY-001
+
+---
+
+## Sprint Allocation
+
+### Sprint 1 (Semaines 1-2) - 32 points
+
+**Goal:** Import GL fonctionnel + Contexte PCG + Détection statistique de base
+
+| Story | Description | Points | Priority |
+|-------|-------------|--------|----------|
+| STORY-000 | Setup projet | 3 | Must |
+| STORY-001 | Charger Excel | 3 | Must |
+| STORY-002 | Détecter format | 5 | Should |
+| STORY-003 | Mapping manuel | 3 | Must |
+| STORY-009 | AccountingContext (PCG) | 5 | Must |
+| STORY-010 | Profiler | 5 | Must |
+| STORY-004 | Concentrations | 3 | Must |
+| STORY-005 | Z-scores | 3 | Must |
+| STORY-007 | Montants ronds | 2 | Should |
+
+**Total:** 32 points / 35 capacity (91%)
+
+**Deliverables Sprint 1:**
+- Projet setup avec CI
+- Import GL multi-format fonctionnel
+- PCG chargé et utilisable
+- Profil statistique des données
+- Détection: concentrations, Z-scores, montants ronds
+
+**Risks:**
+- Formats GL non documentés → mitigation: commencer par format connu
+
+---
+
+### Sprint 2 (Semaines 3-4) - 30 points
+
+**Goal:** Détection complète + Qualification + Run Rate + Rapport = **MVP**
+
+| Story | Description | Points | Priority |
+|-------|-------------|--------|----------|
+| STORY-006 | Identifier provisions | 5 | Must |
+| STORY-008 | Analyser journaux OD | 3 | Should |
+| STORY-011 | Contextualiser anomalies | 3 | Must |
+| STORY-012 | Questions qualificatives | 3 | Must |
+| STORY-013 | Commentaires | 2 | Must |
+| STORY-014 | Sauvegarde YAML | 3 | Must |
+| STORY-015 | Calcul run rate | 3 | Must |
+| STORY-016 | Neutralisation | 5 | Must |
+| STORY-017 | Rapport Excel | 5 | Must |
+
+**Total:** 32 points / 35 capacity (91%)
+
+**Deliverables Sprint 2:**
+- Détection provisions et journaux OD
+- Contextualisation PCG des anomalies
+- Workflow de qualification complet
+- Calcul run rate avec neutralisation
+- Rapport Excel multi-onglets
+- **MVP FONCTIONNEL**
+
+**Risks:**
+- Workflow qualification trop complexe → mitigation: garder simple (CLI)
+
+---
+
+### Sprint 3 (Semaines 5-6) - 16 points
+
+**Goal:** Module IA optionnel + Polish final
+
+| Story | Description | Points | Priority |
+|-------|-------------|--------|----------|
+| STORY-018 | Comparatif Run Rate | 3 | Must |
+| STORY-019 | Benford (IA) | 3 | Could |
+| STORY-020 | Isolation Forest (IA) | 5 | Could |
+| STORY-021 | NLP libellés (IA) | 5 | Could |
+
+**Total:** 16 points / 35 capacity (46%)
+
+**Deliverables Sprint 3:**
+- Comparatif amélioré dans rapport
+- Module IA Benford
+- Module IA Isolation Forest
+- Module IA NLP
+
+**Notes:**
+- Sprint plus léger pour polish et documentation
+- Module IA optionnel (dépendances séparées)
+
+---
+
+## Epic Traceability
+
+| Epic | Stories | Points | Sprint |
+|------|---------|--------|--------|
+| Infrastructure | STORY-000 | 3 | 1 |
+| EPIC-001: Import | STORY-001, 002, 003 | 11 | 1 |
+| EPIC-002: Détection | STORY-004, 005, 006, 007, 008 | 16 | 1-2 |
+| EPIC-002b: Contexte | STORY-009, 010, 011 | 13 | 1-2 |
+| EPIC-003: Qualification | STORY-012, 013, 014 | 8 | 2 |
+| EPIC-004: Run Rate | STORY-015, 016 | 8 | 2 |
+| EPIC-005: Rapport | STORY-017, 018 | 8 | 2-3 |
+| EPIC-006: IA | STORY-019, 020, 021 | 13 | 3 |
+
+---
+
+## Requirements Coverage
+
+| FR | Story | Sprint |
+|----|-------|--------|
+| FR-001 | STORY-001 | 1 |
+| FR-002 | STORY-002 | 1 |
+| FR-003 | STORY-003 | 1 |
+| FR-004 | STORY-004 | 1 |
+| FR-005 | STORY-005 | 1 |
+| FR-006 | STORY-006 | 2 |
+| FR-007 | STORY-007 | 1 |
+| FR-008 | STORY-008 | 2 |
+| FR-009 | STORY-012 | 2 |
+| FR-010 | STORY-013 | 2 |
+| FR-011 | STORY-014 | 2 |
+| FR-012 | STORY-015 | 2 |
+| FR-013 | STORY-016 | 2 |
+| FR-014 | STORY-017 | 2 |
+| FR-015 | STORY-018 | 3 |
+| FR-016 | STORY-019 | 3 |
+| FR-017 | STORY-020 | 3 |
+| FR-018 | STORY-021 | 3 |
+
+**Coverage:** 18/18 FRs (100%)
+
+---
+
+## Risks and Mitigation
+
+### High
+
+| Risk | Mitigation |
+|------|------------|
+| Formats GL non documentés | Commencer par format Sage (bien connu) |
+| Faux positifs excessifs | Contextualisation PCG + seuils conservateurs |
+
+### Medium
+
+| Risk | Mitigation |
+|------|------------|
+| Performance sur gros fichiers | Vectorisation pandas, profiling |
+| PCG incomplet | Prévoir fallback si compte non trouvé |
+
+### Low
+
+| Risk | Mitigation |
+|------|------------|
+| Dépendances IA lourdes | Module IA optionnel, dépendances séparées |
+
+---
+
+## Definition of Done
+
+Pour qu'une story soit considérée complète :
+
+- [ ] Code implémenté et commité
+- [ ] Tests unitaires écrits et passants (≥70% coverage)
+- [ ] Code linted (black, flake8)
+- [ ] Docstrings pour fonctions publiques
+- [ ] Acceptance criteria validés
+- [ ] Intégré dans le workflow principal
+
+---
+
+## Next Steps
+
+**Immédiat:** Commencer Sprint 1
+
+**Première story:** `STORY-000` (Setup projet)
+
+```bash
+# Pour commencer l'implémentation:
+/dev-story STORY-000
+```
+
+**Sprint cadence:**
+- Sprint length: 2 semaines
+- Sprint review: Fin de semaine 2
+- MVP attendu: Fin Sprint 2 (semaine 4)
+
+---
+
+*Document généré par BMAD Method v6 - Phase 4 Implementation Planning*
