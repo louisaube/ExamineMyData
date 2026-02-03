@@ -83,6 +83,11 @@ async def home(request: Request):
     return templates.TemplateResponse("upload.html", {"request": request})
 
 
+@app.get("/analyze")
+async def analyze_redirect():
+    return RedirectResponse(url="/", status_code=303)
+
+
 @app.post("/analyze")
 async def analyze(
     request: Request,
