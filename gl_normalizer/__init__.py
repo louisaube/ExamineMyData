@@ -58,7 +58,7 @@ Usage avancé:
     print(drilldown.format_drilldown_report(analysis))
 """
 
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 __author__ = "GL Normalizer Team"
 
 # API publique principale
@@ -120,6 +120,31 @@ from .security import (
     check_dataframe_limits,
     validate_file_extension,
     get_limits_summary,
+)
+from .accounting_context import (
+    AccountingContext,
+    AccountClassification,
+    ExpectedBehavior,
+    ChargeFrequency,
+    AccountBehavior,
+    get_pcg_context,
+)
+from .profiler import (
+    Profiler,
+    ColumnProfile,
+    AccountProfile,
+    BaselineProfile,
+    DataProfileResult,
+    profile_gl,
+)
+from .detector import (
+    AnomalyDetector,
+    ConcentrationDetector,
+    RoundAmountDetector,
+    ConcentrationAnomaly,
+    RoundAmountAnomaly,
+    DetectionResult,
+    detect_anomalies,
 )
 
 # Exports publics
@@ -186,6 +211,28 @@ __all__ = [
     "check_dataframe_limits",
     "validate_file_extension",
     "get_limits_summary",
+    # Accounting Context (PCG)
+    "AccountingContext",
+    "AccountClassification",
+    "ExpectedBehavior",
+    "ChargeFrequency",
+    "AccountBehavior",
+    "get_pcg_context",
+    # Profiler
+    "Profiler",
+    "ColumnProfile",
+    "AccountProfile",
+    "BaselineProfile",
+    "DataProfileResult",
+    "profile_gl",
+    # Detector
+    "AnomalyDetector",
+    "ConcentrationDetector",
+    "RoundAmountDetector",
+    "ConcentrationAnomaly",
+    "RoundAmountAnomaly",
+    "DetectionResult",
+    "detect_anomalies",
     # AI Module
     "ai",
 ]

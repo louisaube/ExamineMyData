@@ -8,7 +8,7 @@ metadata:
   project_type: "web-app"
   project_level: 2
   initialized_at: "2026-02-02T14:50:00Z"
-  last_updated: "2026-02-03T12:00:00Z"
+  last_updated: "2026-02-03T14:00:00Z"
 
 # Phase 1: Discovery
 phase_1_discovery:
@@ -54,11 +54,21 @@ phase_4_implementation:
     total_sprints: 3
   stories:
     total: 22
-    completed: 0
+    completed: 7
     in_progress: 0
-    pending: 22
+    pending: 15
+    completed_stories:
+      - "STORY-000: Setup projet (CI GitHub Actions)"
+      - "STORY-001: Charger fichier Excel (déjà existant)"
+      - "STORY-002: Détecter format automatiquement (déjà existant)"
+      - "STORY-003: Mapping manuel colonnes (déjà existant)"
+      - "STORY-004: Détection concentrations"
+      - "STORY-005: Calcul Z-scores (déjà existant)"
+      - "STORY-007: Montants ronds"
+      - "STORY-009: AccountingContext (PCG)"
+      - "STORY-010: Profiler (stats)"
 
 # Current workflow position
 current_phase: 4
 current_step: "implementation"
-next_recommended_action: "/dev-story STORY-000"
+next_recommended_action: "/dev-story STORY-006"
