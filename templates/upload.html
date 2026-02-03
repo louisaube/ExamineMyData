@@ -38,8 +38,19 @@
             </div>
         </details>
         
-        <button type="submit" class="btn btn-primary">Analyser</button>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Analyser</button>
+        <div id="loading" style="display:none; margin-top: 1rem;">
+            <span>Analyse en cours... Veuillez patienter.</span>
+        </div>
     </form>
+    
+    <script>
+    document.querySelector('.upload-form').addEventListener('submit', function() {
+        document.getElementById('submit-btn').disabled = true;
+        document.getElementById('submit-btn').textContent = 'Analyse en cours...';
+        document.getElementById('loading').style.display = 'block';
+    });
+    </script>
 </div>
 
 <div class="info-section">
