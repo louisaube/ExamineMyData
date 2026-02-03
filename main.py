@@ -52,6 +52,7 @@ class JobStatus(Enum):
     ANALYZING = "analyzing"
     COMPLETED = "completed"
     ERROR = "error"
+    NEEDS_MAPPING = "needs_mapping"
 
 
 class AnalysisCache:
@@ -631,6 +632,198 @@ async def execute_drilldown(job_id: str, question_id: str):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+# =====================================================
+# COLUMN MAPPING - Mapping manuel des colonnes (STORY-031)
+# =====================================================
+
+@app.get("/mapping/{job_id}", response_class=HTMLResponse)
+async def mapping_page(request: Request, job_id: str):
+    """Page de mapping manuel des colonnes"""
+    data = analysis_cache.get(job_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Job non trouve")
+
+    # Verifier qu'on a bien besoin du mapping
+    if data.get("status") not in [JobStatus.NEEDS_MAPPING.value, "needs_mapping"]:
+        # Rediriger vers la page appropriee
+        if data.get("status") == JobStatus.COMPLETED.value:
+            return RedirectResponse(url=f"/results/{job_id}", status_code=303)
+        return RedirectResponse(url=f"/loading/{job_id}", status_code=303)
+
+    return templates.TemplateResponse("mapping.html", {
+        "request": request,
+        "job_id": job_id,
+        "filename": data.get("filename", "Fichier inconnu"),
+        "columns": data.get("columns", []),
+        "year": data.get("year", 2024),
+        "preview_data": data.get("preview_data", []),
+    })
+
+
+@app.post("/mapping/{job_id}")
+async def submit_mapping(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    job_id: str,
+    compte_column: str = Form(...),
+    date_column: str = Form(...),
+    montant_column: str = Form(...),
+    libelle_column: str = Form(...),
+    journal_column: Optional[str] = Form(None),
+    save_mapping: Optional[str] = Form(None),
+    year: int = Form(...),
+):
+    """Soumet le mapping des colonnes et lance l'analyse"""
+    data = analysis_cache.get(job_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Job non trouve")
+
+    try:
+        # Construire le mapping
+        column_mapping = {
+            "compte": compte_column,
+            "date": date_column,
+            "montant": montant_column,
+            "libelle": libelle_column,
+        }
+        if journal_column:
+            column_mapping["journal"] = journal_column
+
+        # Mettre a jour le cache avec le mapping
+        path = Path(data.get("path", ""))
+        if not path.exists():
+            return templates.TemplateResponse("mapping.html", {
+                "request": request,
+                "job_id": job_id,
+                "filename": data.get("filename", ""),
+                "columns": data.get("columns", []),
+                "year": year,
+                "error": "Fichier non trouve. Veuillez recharger le fichier.",
+            })
+
+        # Reinitialiser le job
+        analysis_cache.set(job_id, {
+            "type": "pending",
+            "status": JobStatus.PENDING.value,
+            "message": "Demarrage de l'analyse avec mapping...",
+            "progress": 0,
+            "year": year,
+            "column_mapping": column_mapping,
+            "path": str(path),
+        })
+
+        # Lancer l'analyse avec le mapping
+        background_tasks.add_task(
+            run_analysis_with_mapping,
+            job_id,
+            path,
+            year,
+            column_mapping,
+        )
+
+        return RedirectResponse(url=f"/loading/{job_id}", status_code=303)
+
+    except Exception as e:
+        return templates.TemplateResponse("mapping.html", {
+            "request": request,
+            "job_id": job_id,
+            "filename": data.get("filename", ""),
+            "columns": data.get("columns", []),
+            "year": year,
+            "error": f"Erreur: {str(e)}",
+        })
+
+
+@app.get("/api/preview/{job_id}")
+async def get_preview_data(
+    job_id: str,
+    compte: str,
+    date: str,
+    montant: str,
+    libelle: str,
+    journal: Optional[str] = None,
+):
+    """Retourne un apercu des donnees avec le mapping specifie"""
+    data = analysis_cache.get(job_id)
+    if data is None:
+        return JSONResponse({"success": False, "error": "Job non trouve"}, status_code=404)
+
+    try:
+        path = Path(data.get("path", ""))
+        if not path.exists():
+            return JSONResponse({"success": False, "error": "Fichier non trouve"}, status_code=404)
+
+        # Lire les 5 premieres lignes
+        df = pd.read_excel(str(path), nrows=5)
+
+        # Construire l'apercu avec le mapping
+        preview = []
+        for _, row in df.iterrows():
+            preview.append({
+                "compte": str(row.get(compte, "-")) if compte in df.columns else "-",
+                "date": str(row.get(date, "-")) if date in df.columns else "-",
+                "montant": str(row.get(montant, "-")) if montant in df.columns else "-",
+                "libelle": str(row.get(libelle, "-")) if libelle in df.columns else "-",
+                "journal": str(row.get(journal, "-")) if journal and journal in df.columns else "-",
+            })
+
+        return JSONResponse({"success": True, "preview": preview})
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+def run_analysis_with_mapping(job_id: str, path: Path, year: int, column_mapping: dict):
+    """Execute l'analyse avec un mapping de colonnes personnalise"""
+    try:
+        # Phase 1: Chargement avec mapping
+        analysis_cache.update_status(job_id, JobStatus.LOADING, "Chargement du fichier avec mapping...", 10)
+
+        loader = GLLoader(str(path), custom_mapping=column_mapping)
+        df = loader.load()
+        row_count = len(df)
+
+        analysis_cache.update_status(job_id, JobStatus.LOADING, f"Fichier charge: {row_count:,} ecritures", 30)
+
+        # Phase 2: Analyse
+        analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Profilage des donnees...", 40)
+        analyzer = GLAnalyzer(df, year)
+
+        analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Detection des anomalies...", 60)
+        result = analyzer.analyze()
+
+        analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Calcul du run rate...", 80)
+
+        # Analyse autonome IA
+        analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Analyse proactive IA...", 90)
+        try:
+            autonomous_analysis = run_autonomous_analysis(df, auto_execute=False)
+        except Exception:
+            autonomous_analysis = None
+
+        analysis_cache.set(job_id, {
+            "type": "single",
+            "status": JobStatus.COMPLETED.value,
+            "result": result,
+            "year": year,
+            "path": str(path),
+            "df": df,
+            "column_mapping": column_mapping,
+            "autonomous_analysis": autonomous_analysis,
+            "message": "Analyse terminee",
+            "progress": 100,
+        })
+
+    except Exception as e:
+        analysis_cache.set(job_id, {
+            "type": "error",
+            "status": JobStatus.ERROR.value,
+            "error": str(e),
+            "message": f"Erreur: {str(e)}",
+            "progress": 0,
+        })
+
+
 @app.get("/api/drilldown/{job_id}")
 async def get_drilldown_data(job_id: str):
     """Récupère les données de l'analyse autonome"""
@@ -656,6 +849,160 @@ async def get_drilldown_data(job_id: str):
 
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+# =====================================================
+# QUALIFICATION - Qualification des anomalies (STORY-032)
+# =====================================================
+
+# Storage for qualification data (per job)
+qualification_cache: Dict[str, Dict[str, Any]] = {}
+
+
+@app.get("/qualification/{job_id}", response_class=HTMLResponse)
+async def qualification_page(request: Request, job_id: str, index: int = 0):
+    """Page de qualification des anomalies"""
+    data = analysis_cache.get(job_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Analyse non trouvée ou expirée")
+
+    if data.get("status") != JobStatus.COMPLETED.value:
+        return RedirectResponse(url=f"/loading/{job_id}", status_code=303)
+
+    # Récupérer les anomalies du résultat
+    result = data.get("result")
+    anomalies = []
+    if result and hasattr(result, 'anomalies'):
+        anomalies = result.anomalies
+
+    if not anomalies:
+        return templates.TemplateResponse("qualification.html", {
+            "request": request,
+            "job_id": job_id,
+            "anomalies": [],
+            "current_index": 0,
+            "total_count": 0,
+            "current_anomaly": None,
+        })
+
+    # Bound index
+    total_count = len(anomalies)
+    index = max(0, min(index, total_count - 1))
+
+    # Récupérer les qualifications sauvegardées
+    qual_data = qualification_cache.get(job_id, {})
+    saved_qualifications = qual_data.get("qualifications", [None] * total_count)
+    saved_comments = qual_data.get("comments", [""] * total_count)
+
+    # Current anomaly
+    current_anomaly = anomalies[index]
+
+    return templates.TemplateResponse("qualification.html", {
+        "request": request,
+        "job_id": job_id,
+        "anomalies": anomalies,
+        "current_index": index + 1,  # 1-based for display
+        "total_count": total_count,
+        "current_anomaly": current_anomaly,
+        "saved_qualifications": saved_qualifications,
+        "saved_comments": saved_comments,
+    })
+
+
+@app.post("/qualification/{job_id}/save")
+async def save_qualification(
+    request: Request,
+    job_id: str,
+    anomaly_index: int = Form(...),
+    qualification: Optional[str] = Form(None),
+    comment: Optional[str] = Form(None),
+    action: str = Form("next"),
+):
+    """Sauvegarde la qualification d'une anomalie"""
+    data = analysis_cache.get(job_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Analyse non trouvée")
+
+    result = data.get("result")
+    anomalies = result.anomalies if result and hasattr(result, 'anomalies') else []
+    total_count = len(anomalies)
+
+    if total_count == 0:
+        return RedirectResponse(url=f"/results/{job_id}", status_code=303)
+
+    # Initialiser le cache de qualification si nécessaire
+    if job_id not in qualification_cache:
+        qualification_cache[job_id] = {
+            "qualifications": [None] * total_count,
+            "comments": [""] * total_count,
+        }
+
+    # Sauvegarder la qualification
+    if 0 <= anomaly_index < total_count:
+        if qualification:
+            qualification_cache[job_id]["qualifications"][anomaly_index] = qualification
+        if comment:
+            qualification_cache[job_id]["comments"][anomaly_index] = comment
+
+    # Navigation
+    if action == "finish":
+        # Sauvegarder dans les résultats et retourner
+        data["qualifications"] = qualification_cache[job_id]
+        return RedirectResponse(url=f"/results/{job_id}", status_code=303)
+    else:
+        # Next anomaly
+        next_index = anomaly_index + 1
+        if next_index >= total_count:
+            return RedirectResponse(url=f"/results/{job_id}", status_code=303)
+        return RedirectResponse(url=f"/qualification/{job_id}?index={next_index}", status_code=303)
+
+
+@app.post("/api/qualification/{job_id}/comment")
+async def save_qualification_comment(request: Request, job_id: str):
+    """Sauvegarde automatique d'un commentaire (AJAX)"""
+    try:
+        body = await request.json()
+        index = body.get("index", 0)
+        comment = body.get("comment", "")
+
+        data = analysis_cache.get(job_id)
+        if data is None:
+            return JSONResponse({"success": False, "error": "Job non trouvé"}, status_code=404)
+
+        result = data.get("result")
+        anomalies = result.anomalies if result and hasattr(result, 'anomalies') else []
+        total_count = len(anomalies)
+
+        if job_id not in qualification_cache:
+            qualification_cache[job_id] = {
+                "qualifications": [None] * total_count,
+                "comments": [""] * total_count,
+            }
+
+        if 0 <= index < total_count:
+            qualification_cache[job_id]["comments"][index] = comment
+
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/qualification/{job_id}/summary")
+async def get_qualification_summary(job_id: str):
+    """Retourne un résumé des qualifications"""
+    qual_data = qualification_cache.get(job_id, {})
+    qualifications = qual_data.get("qualifications", [])
+
+    summary = {
+        "justified": sum(1 for q in qualifications if q == "justified"),
+        "not_justified": sum(1 for q in qualifications if q == "not_justified"),
+        "investigate": sum(1 for q in qualifications if q == "investigate"),
+        "pending": sum(1 for q in qualifications if q is None),
+        "total": len(qualifications),
+    }
+
+    return JSONResponse({"success": True, "summary": summary})
 
 
 if __name__ == "__main__":
