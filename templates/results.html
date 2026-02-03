@@ -196,8 +196,13 @@
     <!-- Anomalies détaillées -->
     {% if anomalies %}
     <div class="anomalies-section">
-        <h3>Anomalies détectées ({{ anomalies|length }})</h3>
-        <table class="data-table">
+        <div class="anomalies-header">
+            <h3>Anomalies détectées ({{ anomalies|length }})</h3>
+            <a href="/qualification/{{ job_id }}" class="btn btn-primary" aria-label="Qualifier les {{ anomalies|length }} anomalies détectées">
+                Qualifier les anomalies
+            </a>
+        </div>
+        <table class="data-table" aria-label="Liste des anomalies détectées">
             <thead>
                 <tr>
                     <th>Compte</th>

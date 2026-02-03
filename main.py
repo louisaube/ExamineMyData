@@ -851,6 +851,160 @@ async def get_drilldown_data(job_id: str):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+# =====================================================
+# QUALIFICATION - Qualification des anomalies (STORY-032)
+# =====================================================
+
+# Storage for qualification data (per job)
+qualification_cache: Dict[str, Dict[str, Any]] = {}
+
+
+@app.get("/qualification/{job_id}", response_class=HTMLResponse)
+async def qualification_page(request: Request, job_id: str, index: int = 0):
+    """Page de qualification des anomalies"""
+    data = analysis_cache.get(job_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Analyse non trouvée ou expirée")
+
+    if data.get("status") != JobStatus.COMPLETED.value:
+        return RedirectResponse(url=f"/loading/{job_id}", status_code=303)
+
+    # Récupérer les anomalies du résultat
+    result = data.get("result")
+    anomalies = []
+    if result and hasattr(result, 'anomalies'):
+        anomalies = result.anomalies
+
+    if not anomalies:
+        return templates.TemplateResponse("qualification.html", {
+            "request": request,
+            "job_id": job_id,
+            "anomalies": [],
+            "current_index": 0,
+            "total_count": 0,
+            "current_anomaly": None,
+        })
+
+    # Bound index
+    total_count = len(anomalies)
+    index = max(0, min(index, total_count - 1))
+
+    # Récupérer les qualifications sauvegardées
+    qual_data = qualification_cache.get(job_id, {})
+    saved_qualifications = qual_data.get("qualifications", [None] * total_count)
+    saved_comments = qual_data.get("comments", [""] * total_count)
+
+    # Current anomaly
+    current_anomaly = anomalies[index]
+
+    return templates.TemplateResponse("qualification.html", {
+        "request": request,
+        "job_id": job_id,
+        "anomalies": anomalies,
+        "current_index": index + 1,  # 1-based for display
+        "total_count": total_count,
+        "current_anomaly": current_anomaly,
+        "saved_qualifications": saved_qualifications,
+        "saved_comments": saved_comments,
+    })
+
+
+@app.post("/qualification/{job_id}/save")
+async def save_qualification(
+    request: Request,
+    job_id: str,
+    anomaly_index: int = Form(...),
+    qualification: Optional[str] = Form(None),
+    comment: Optional[str] = Form(None),
+    action: str = Form("next"),
+):
+    """Sauvegarde la qualification d'une anomalie"""
+    data = analysis_cache.get(job_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Analyse non trouvée")
+
+    result = data.get("result")
+    anomalies = result.anomalies if result and hasattr(result, 'anomalies') else []
+    total_count = len(anomalies)
+
+    if total_count == 0:
+        return RedirectResponse(url=f"/results/{job_id}", status_code=303)
+
+    # Initialiser le cache de qualification si nécessaire
+    if job_id not in qualification_cache:
+        qualification_cache[job_id] = {
+            "qualifications": [None] * total_count,
+            "comments": [""] * total_count,
+        }
+
+    # Sauvegarder la qualification
+    if 0 <= anomaly_index < total_count:
+        if qualification:
+            qualification_cache[job_id]["qualifications"][anomaly_index] = qualification
+        if comment:
+            qualification_cache[job_id]["comments"][anomaly_index] = comment
+
+    # Navigation
+    if action == "finish":
+        # Sauvegarder dans les résultats et retourner
+        data["qualifications"] = qualification_cache[job_id]
+        return RedirectResponse(url=f"/results/{job_id}", status_code=303)
+    else:
+        # Next anomaly
+        next_index = anomaly_index + 1
+        if next_index >= total_count:
+            return RedirectResponse(url=f"/results/{job_id}", status_code=303)
+        return RedirectResponse(url=f"/qualification/{job_id}?index={next_index}", status_code=303)
+
+
+@app.post("/api/qualification/{job_id}/comment")
+async def save_qualification_comment(request: Request, job_id: str):
+    """Sauvegarde automatique d'un commentaire (AJAX)"""
+    try:
+        body = await request.json()
+        index = body.get("index", 0)
+        comment = body.get("comment", "")
+
+        data = analysis_cache.get(job_id)
+        if data is None:
+            return JSONResponse({"success": False, "error": "Job non trouvé"}, status_code=404)
+
+        result = data.get("result")
+        anomalies = result.anomalies if result and hasattr(result, 'anomalies') else []
+        total_count = len(anomalies)
+
+        if job_id not in qualification_cache:
+            qualification_cache[job_id] = {
+                "qualifications": [None] * total_count,
+                "comments": [""] * total_count,
+            }
+
+        if 0 <= index < total_count:
+            qualification_cache[job_id]["comments"][index] = comment
+
+        return JSONResponse({"success": True})
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/qualification/{job_id}/summary")
+async def get_qualification_summary(job_id: str):
+    """Retourne un résumé des qualifications"""
+    qual_data = qualification_cache.get(job_id, {})
+    qualifications = qual_data.get("qualifications", [])
+
+    summary = {
+        "justified": sum(1 for q in qualifications if q == "justified"),
+        "not_justified": sum(1 for q in qualifications if q == "not_justified"),
+        "investigate": sum(1 for q in qualifications if q == "investigate"),
+        "pending": sum(1 for q in qualifications if q is None),
+        "total": len(qualifications),
+    }
+
+    return JSONResponse({"success": True, "summary": summary})
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=5000)
