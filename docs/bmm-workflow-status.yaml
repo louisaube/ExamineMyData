@@ -8,7 +8,7 @@ metadata:
   project_type: "web-app"
   project_level: 2
   initialized_at: "2026-02-02T14:50:00Z"
-  last_updated: "2026-02-03T17:00:00Z"
+  last_updated: "2026-02-03T18:00:00Z"
 
 # Phase 1: Discovery
 phase_1_discovery:
@@ -58,13 +58,13 @@ phase_4_implementation:
     status: "completed"
     requirement: "required"
     file: "docs/sprint-plan-gl-normalizer-2026-02-03.md"
-    current_sprint: 1
-    total_sprints: 3
+    current_sprint: 7
+    total_sprints: 7
   stories:
-    total: 27
-    completed: 27
+    total: 33
+    completed: 30
     in_progress: 0
-    pending: 0
+    pending: 3
     completed_stories:
       # Sprint 1 - Fondations
       - "STORY-000: Setup projet (CI GitHub Actions) [NEW]"
@@ -130,10 +130,36 @@ sprint_6_backlog:
       points: 5
       notes: "Implémenté: pattern_detector.py, autonomous_drilldown.py, UI drill-down"
 
+# Sprint 7 - UX Screens (NEW)
+sprint_7_backlog:
+  status: "not_started"
+  goal: "Implémenter Column Mapping + Qualification Web UI + WCAG AAA"
+  stories:
+    - id: "STORY-031"
+      title: "Column Mapping Web UI"
+      status: "not_started"
+      priority: "must"
+      points: 5
+      fr_ref: "FR-003"
+      ux_ref: "ux-design-gl-normalizer-2026-02-03.md - Screen 2"
+    - id: "STORY-032"
+      title: "Qualification Web UI"
+      status: "not_started"
+      priority: "must"
+      points: 8
+      fr_ref: "FR-009, FR-010, FR-011"
+      ux_ref: "ux-design-gl-normalizer-2026-02-03.md - Screen 5"
+    - id: "STORY-033"
+      title: "WCAG AAA Accessibility Updates"
+      status: "not_started"
+      priority: "should"
+      points: 5
+      nfr_ref: "WCAG 2.1 Level AAA"
+
 # Current workflow position
 current_phase: 4
-current_step: "sprint_6"
-next_recommended_action: "UX Design completed - Ready for Column Mapping & Qualification screens implementation"
+current_step: "sprint_7"
+next_recommended_action: "Begin Sprint 7: /dev-story STORY-031 (Column Mapping Web UI)"
 
 # Notes
 notes: |
@@ -170,3 +196,11 @@ notes: |
     - Component library and design tokens
     - Developer handoff documentation
   - New screens to implement: Column Mapping, Qualification
+
+  Session 5 - Sprint Planning (Sprint 7):
+  - Added 3 new stories for UX implementation
+    - STORY-031: Column Mapping Web UI (5 points)
+    - STORY-032: Qualification Web UI (8 points)
+    - STORY-033: WCAG AAA Accessibility (5 points)
+  - Total Sprint 7: 18 points
+  - Epic: EPIC-007 UX Enhancement
