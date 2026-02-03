@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Upload - GL Normalizer{% endblock %}
+
+{% block content %}
+<div class="upload-section">
+    <h2>Analyser votre Grand Livre</h2>
+    
+    {% if error %}
+    <div class="alert alert-error">
+        {{ error }}
+    </div>
+    {% endif %}
+    
+    <form action="/analyze" method="post" enctype="multipart/form-data" class="upload-form">
+        <div class="form-group">
+            <label for="file1">Fichier GL (Excel)</label>
+            <input type="file" id="file1" name="file1" accept=".xlsx,.xls" required>
+            <small>Format: Excel (.xlsx, .xls)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="year1">Année</label>
+            <input type="number" id="year1" name="year1" value="2024" min="2000" max="2100" required>
+        </div>
+        
+        <details class="comparison-section">
+            <summary>Comparer avec une autre année (optionnel)</summary>
+            
+            <div class="form-group">
+                <label for="file2">Second fichier GL</label>
+                <input type="file" id="file2" name="file2" accept=".xlsx,.xls">
+            </div>
+            
+            <div class="form-group">
+                <label for="year2">Année N-1</label>
+                <input type="number" id="year2" name="year2" value="2023" min="2000" max="2100">
+            </div>
+        </details>
+        
+        <button type="submit" class="btn btn-primary">Analyser</button>
+    </form>
+</div>
+
+<div class="info-section">
+    <h3>Fonctionnalités</h3>
+    <ul>
+        <li>Calcul du run rate opérationnel</li>
+        <li>Détection des anomalies de provisionnement</li>
+        <li>Analyse des concentrations mensuelles</li>
+        <li>Comparaison N vs N-1</li>
+        <li>Export rapport Excel</li>
+    </ul>
+    
+    <h3>Formats supportés</h3>
+    <p>Sage, Cegid, Quadratus, EBP, et exports Excel génériques.</p>
+</div>
+{% endblock %}

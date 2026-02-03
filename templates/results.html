@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Résultats - GL Normalizer{% endblock %}
+
+{% block content %}
+<div class="results-section">
+    <div class="results-header">
+        <h2>Résultats de l'analyse</h2>
+        <a href="/report/{{ job_id }}" class="btn btn-secondary">Télécharger le rapport Excel</a>
+    </div>
+    
+    {% if type == "comparison" %}
+    <div class="summary-cards">
+        <div class="card">
+            <h3>Année {{ year2 }}</h3>
+            <p class="big-number">{{ "{:,.0f}".format(total_n1) }} €</p>
+            <small>Total charges</small>
+        </div>
+        
+        <div class="card">
+            <h3>Année {{ year1 }}</h3>
+            <p class="big-number">{{ "{:,.0f}".format(total_n) }} €</p>
+            <small>Total charges</small>
+        </div>
+        
+        <div class="card {% if variation_brute > 0 %}card-warning{% else %}card-success{% endif %}">
+            <h3>Variation comptable</h3>
+            <p class="big-number">{{ "{:+,.0f}".format(variation_brute) }} €</p>
+            <small>Brute</small>
+        </div>
+        
+        <div class="card {% if variation_normalisee > 0 %}card-warning{% else %}card-success{% endif %}">
+            <h3>Variation run rate</h3>
+            <p class="big-number">{{ "{:+,.0f}".format(variation_normalisee) }} €</p>
+            <small>Normalisée</small>
+        </div>
+    </div>
+    
+    <div class="impact-section">
+        <h3>Impact des provisions</h3>
+        <p class="impact-value">{{ "{:+,.0f}".format(ecart) }} €</p>
+        <p>Écart entre la variation comptable et le run rate réel</p>
+    </div>
+    
+    {% else %}
+    
+    <div class="summary-cards">
+        <div class="card">
+            <h3>Année analysée</h3>
+            <p class="big-number">{{ year }}</p>
+        </div>
+        
+        <div class="card">
+            <h3>Écritures</h3>
+            <p class="big-number">{{ "{:,}".format(total_entries) }}</p>
+        </div>
+        
+        {% if run_rate %}
+        <div class="card">
+            <h3>Run Rate mensuel</h3>
+            <p class="big-number">{{ "{:,.0f}".format(run_rate.run_rate_mensuel) }} €</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if anomalies %}
+    <div class="anomalies-section">
+        <h3>Anomalies détectées ({{ anomalies|length }})</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Compte</th>
+                    <th>Catégorie</th>
+                    <th>Score</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for anomaly in anomalies %}
+                <tr>
+                    <td>{{ anomaly.compte if anomaly.compte else '-' }}</td>
+                    <td>{{ anomaly.category.value if anomaly.category else '-' }}</td>
+                    <td>{{ "{:.2f}".format(anomaly.score) if anomaly.score else '-' }}</td>
+                    <td>{{ anomaly.description if anomaly.description else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    {% if regularizations %}
+    <div class="regularizations-section">
+        <h3>Régularisations détectées</h3>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Journal</th>
+                    <th>Compte</th>
+                    <th>Montant</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for reg in regularizations %}
+                <tr>
+                    <td>{{ reg.type.value if reg.type else '-' }}</td>
+                    <td>{{ reg.journal if reg.journal else '-' }}</td>
+                    <td>{{ reg.compte if reg.compte else '-' }}</td>
+                    <td>{{ "{:,.0f}".format(reg.montant) if reg.montant else '-' }} €</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    {% endif %}
+    
+    <div class="actions">
+        <a href="/" class="btn btn-primary">Nouvelle analyse</a>
+    </div>
+</div>
+{% endblock %}
