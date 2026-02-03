@@ -828,24 +828,37 @@ tr.severity-high { background: #ffe5d0; }
 
 <script>
 function executeDrilldown(questionId, jobId) {
-    // Appel API pour exécuter l'analyse drill-down
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'En cours...';
+    
     fetch(`/api/drilldown/${jobId}/${questionId}`, {
         method: 'POST'
     })
     .then(response => response.json())
     .then(data => {
-        if (data.success) {
-            // Afficher le résultat
-            alert(`Analyse terminée: ${data.title}\n\n${data.summary}`);
-            // En production, on afficherait un modal ou on rechargerait la section
+        if (data.success !== false) {
+            const title = data.title || data.question_id || 'Analyse';
+            const summary = data.summary || 'Analyse terminée';
+            const insights = data.insights || [];
+            
+            let message = `${title}\n\n${summary}`;
+            if (insights.length > 0) {
+                message += '\n\nRésultats:\n• ' + insights.slice(0, 5).join('\n• ');
+            }
+            alert(message);
             location.reload();
         } else {
-            alert(`Erreur: ${data.summary}`);
+            alert(`Erreur: ${data.error || data.summary || 'Erreur inconnue'}`);
+            btn.disabled = false;
+            btn.textContent = 'Analyser';
         }
     })
     .catch(error => {
         console.error('Erreur:', error);
         alert('Erreur lors de l\'analyse');
+        btn.disabled = false;
+        btn.textContent = 'Analyser';
     });
 }
 </script>
