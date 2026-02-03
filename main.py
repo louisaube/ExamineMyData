@@ -2,11 +2,13 @@ import os
 import uuid
 import tempfile
 import time
+import threading
 from pathlib import Path
 from typing import Optional, Dict, Any
+from enum import Enum
 
-from fastapi import FastAPI, File, UploadFile, Request, HTTPException, Form
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi import FastAPI, File, UploadFile, Request, HTTPException, Form, BackgroundTasks
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import pandas as pd
@@ -35,27 +37,45 @@ RESULTS_DIR.mkdir(exist_ok=True)
 CACHE_TTL_SECONDS = 3600  # 1 hour
 
 
+class JobStatus(Enum):
+    PENDING = "pending"
+    LOADING = "loading"
+    ANALYZING = "analyzing"
+    COMPLETED = "completed"
+    ERROR = "error"
+
+
 class AnalysisCache:
     def __init__(self, ttl: int = 3600):
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._ttl = ttl
-    
+        self._lock = threading.Lock()
+
     def set(self, job_id: str, data: Dict[str, Any]) -> None:
-        self._cache[job_id] = {
-            "data": data,
-            "created_at": time.time()
-        }
-        self._cleanup()
-    
+        with self._lock:
+            self._cache[job_id] = {
+                "data": data,
+                "created_at": time.time()
+            }
+            self._cleanup()
+
+    def update_status(self, job_id: str, status: JobStatus, message: str = "", progress: int = 0) -> None:
+        with self._lock:
+            if job_id in self._cache:
+                self._cache[job_id]["data"]["status"] = status.value
+                self._cache[job_id]["data"]["message"] = message
+                self._cache[job_id]["data"]["progress"] = progress
+
     def get(self, job_id: str) -> Optional[Dict[str, Any]]:
-        if job_id not in self._cache:
-            return None
-        entry = self._cache[job_id]
-        if time.time() - entry["created_at"] > self._ttl:
-            del self._cache[job_id]
-            return None
-        return entry["data"]
-    
+        with self._lock:
+            if job_id not in self._cache:
+                return None
+            entry = self._cache[job_id]
+            if time.time() - entry["created_at"] > self._ttl:
+                del self._cache[job_id]
+                return None
+            return entry["data"]
+
     def _cleanup(self) -> None:
         now = time.time()
         expired = [k for k, v in self._cache.items() if now - v["created_at"] > self._ttl]
@@ -78,6 +98,65 @@ def save_upload(file: UploadFile) -> Path:
     return file_path
 
 
+def run_analysis_background(job_id: str, path1: Path, year1: int, path2: Optional[Path] = None, year2: Optional[int] = None):
+    """Exécute l'analyse en arrière-plan"""
+    try:
+        # Phase 1: Chargement
+        analysis_cache.update_status(job_id, JobStatus.LOADING, "Chargement du fichier...", 10)
+        loader1 = GLLoader(str(path1))
+        df1 = loader1.load()
+        row_count = len(df1)
+
+        analysis_cache.update_status(job_id, JobStatus.LOADING, f"Fichier chargé: {row_count:,} écritures", 30)
+
+        if path2:
+            # Comparaison N vs N-1
+            analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Comparaison des exercices...", 50)
+            comparator = GLComparator(str(path1), str(path2))
+            comparison = comparator.compare()
+
+            analysis_cache.set(job_id, {
+                "type": "comparison",
+                "status": JobStatus.COMPLETED.value,
+                "comparison": comparison,
+                "year1": year1,
+                "year2": year2 or year1 - 1,
+                "path1": str(path1),
+                "path2": str(path2),
+                "message": "Analyse terminée",
+                "progress": 100,
+            })
+        else:
+            # Analyse simple
+            analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Profilage des données...", 40)
+            analyzer = GLAnalyzer(df1, year1)
+
+            analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Détection des anomalies...", 60)
+            result = analyzer.analyze()
+
+            analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Calcul du run rate...", 80)
+
+            analysis_cache.set(job_id, {
+                "type": "single",
+                "status": JobStatus.COMPLETED.value,
+                "result": result,
+                "year": year1,
+                "path": str(path1),
+                "df": df1,
+                "message": "Analyse terminée",
+                "progress": 100,
+            })
+
+    except Exception as e:
+        analysis_cache.set(job_id, {
+            "type": "error",
+            "status": JobStatus.ERROR.value,
+            "error": str(e),
+            "message": f"Erreur: {str(e)}",
+            "progress": 0,
+        })
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("upload.html", {"request": request})
@@ -91,46 +170,43 @@ async def analyze_redirect():
 @app.post("/analyze")
 async def analyze(
     request: Request,
+    background_tasks: BackgroundTasks,
     file1: UploadFile = File(...),
     file2: Optional[UploadFile] = File(None),
     year1: int = Form(...),
     year2: Optional[int] = Form(None),
 ):
     job_id = str(uuid.uuid4())
-    
+
     try:
         path1 = save_upload(file1)
-        
-        loader1 = GLLoader(str(path1))
-        df1 = loader1.load()
-        
+        path2 = None
+
         if file2 and file2.filename:
             path2 = save_upload(file2)
-            comparator = GLComparator(str(path1), str(path2))
-            comparison = comparator.compare()
-            
-            analysis_cache.set(job_id, {
-                "type": "comparison",
-                "comparison": comparison,
-                "year1": year1,
-                "year2": year2 or year1 - 1,
-                "path1": str(path1),
-                "path2": str(path2),
-            })
-        else:
-            analyzer = GLAnalyzer(df1, year1)
-            result = analyzer.analyze()
-            
-            analysis_cache.set(job_id, {
-                "type": "single",
-                "result": result,
-                "year": year1,
-                "path": str(path1),
-                "df": df1,
-            })
-        
-        return RedirectResponse(url=f"/results/{job_id}", status_code=303)
-        
+
+        # Initialiser le job en attente
+        analysis_cache.set(job_id, {
+            "type": "pending",
+            "status": JobStatus.PENDING.value,
+            "message": "Démarrage de l'analyse...",
+            "progress": 0,
+            "year": year1,
+        })
+
+        # Lancer l'analyse en arrière-plan
+        background_tasks.add_task(
+            run_analysis_background,
+            job_id,
+            path1,
+            year1,
+            path2,
+            year2
+        )
+
+        # Rediriger vers la page de chargement
+        return RedirectResponse(url=f"/loading/{job_id}", status_code=303)
+
     except SecurityError as e:
         return templates.TemplateResponse(
             "upload.html",
@@ -145,12 +221,54 @@ async def analyze(
         )
 
 
+@app.get("/loading/{job_id}", response_class=HTMLResponse)
+async def loading_page(request: Request, job_id: str):
+    """Page de chargement avec polling"""
+    data = analysis_cache.get(job_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Job non trouvé")
+
+    return templates.TemplateResponse("loading.html", {
+        "request": request,
+        "job_id": job_id,
+        "year": data.get("year", ""),
+    })
+
+
+@app.get("/api/status/{job_id}")
+async def get_job_status(job_id: str):
+    """API pour vérifier le statut d'un job"""
+    data = analysis_cache.get(job_id)
+    if data is None:
+        return JSONResponse({"status": "not_found"}, status_code=404)
+
+    return JSONResponse({
+        "status": data.get("status", "unknown"),
+        "message": data.get("message", ""),
+        "progress": data.get("progress", 0),
+        "ready": data.get("status") == JobStatus.COMPLETED.value,
+        "error": data.get("status") == JobStatus.ERROR.value,
+    })
+
+
 @app.get("/results/{job_id}", response_class=HTMLResponse)
 async def results(request: Request, job_id: str):
     data = analysis_cache.get(job_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Analyse non trouvée ou expirée")
-    
+
+    # Si encore en cours, rediriger vers la page de chargement
+    if data.get("status") in [JobStatus.PENDING.value, JobStatus.LOADING.value, JobStatus.ANALYZING.value]:
+        return RedirectResponse(url=f"/loading/{job_id}", status_code=303)
+
+    # Si erreur, afficher l'erreur
+    if data.get("status") == JobStatus.ERROR.value:
+        return templates.TemplateResponse(
+            "upload.html",
+            {"request": request, "error": data.get("error", "Erreur inconnue")},
+            status_code=400,
+        )
+
     if data["type"] == "comparison":
         comparison = data["comparison"]
         context = {
@@ -176,10 +294,16 @@ async def results(request: Request, job_id: str):
             "year": data["year"],
             "run_rate": result.run_rate if hasattr(result, 'run_rate') else None,
             "anomalies": result.anomalies[:20] if hasattr(result, 'anomalies') else [],
-            "total_entries": result.total_entries if hasattr(result, 'total_entries') else 0,
-            "regularizations": result.regularizations[:10] if hasattr(result, 'regularizations') else [],
+            "total_entries": result.row_count if hasattr(result, 'row_count') else 0,
+            "account_count": result.account_count if hasattr(result, 'account_count') else 0,
+            "data_quality": result.data_quality if hasattr(result, 'data_quality') else "unknown",
+            "overall_risk_score": result.overall_risk_score if hasattr(result, 'overall_risk_score') else 0,
+            "regularizations": result.regularization_result.regularizations[:10] if hasattr(result, 'regularization_result') and result.regularization_result else [],
+            "summary": result.summary if hasattr(result, 'summary') else {},
+            "warnings": result.warnings[:5] if hasattr(result, 'warnings') else [],
+            "recommendations": result.recommendations[:5] if hasattr(result, 'recommendations') else [],
         }
-    
+
     return templates.TemplateResponse("results.html", context)
 
 
@@ -188,59 +312,97 @@ async def download_report(job_id: str):
     data = analysis_cache.get(job_id)
     if data is None:
         raise HTTPException(status_code=404, detail="Analyse non trouvée ou expirée")
-    
+
+    if data.get("status") != JobStatus.COMPLETED.value:
+        raise HTTPException(status_code=400, detail="Analyse pas encore terminée")
+
     report_path = RESULTS_DIR / f"rapport_{job_id}.xlsx"
-    
+
     try:
         if data["type"] == "comparison":
             generate_excel_report(data["comparison"], str(report_path))
         else:
             result = data["result"]
             with pd.ExcelWriter(str(report_path), engine='openpyxl') as writer:
+                # Synthèse
                 summary_data = {
-                    "Métrique": ["Année", "Total écritures", "Anomalies détectées", "Régularisations détectées"],
+                    "Métrique": [
+                        "Année",
+                        "Total écritures",
+                        "Nombre de comptes",
+                        "Qualité des données",
+                        "Score de risque",
+                        "Anomalies détectées",
+                        "Régularisations détectées",
+                    ],
                     "Valeur": [
                         data["year"],
-                        getattr(result, 'total_entries', 0),
+                        getattr(result, 'row_count', 0),
+                        getattr(result, 'account_count', 0),
+                        getattr(result, 'data_quality', 'unknown'),
+                        f"{getattr(result, 'overall_risk_score', 0):.0%}",
                         len(result.anomalies) if hasattr(result, 'anomalies') else 0,
-                        len(result.regularizations) if hasattr(result, 'regularizations') else 0,
+                        len(result.regularization_result.regularizations) if hasattr(result, 'regularization_result') and result.regularization_result else 0,
                     ]
                 }
                 if hasattr(result, 'run_rate') and result.run_rate:
                     run_rate = result.run_rate
                     summary_data["Métrique"].extend([
                         "Run rate mensuel",
-                        "Total annuel",
+                        "Charges brutes annuelles",
+                        "Produits bruts annuels",
                     ])
                     summary_data["Valeur"].extend([
-                        getattr(run_rate, 'run_rate_mensuel', 0),
-                        getattr(run_rate, 'total_annuel', 0),
+                        f"{getattr(run_rate, 'run_rate_mensuel', 0):,.0f} €",
+                        f"{getattr(run_rate, 'charges_brutes', 0):,.0f} €",
+                        f"{getattr(run_rate, 'produits_bruts', 0):,.0f} €",
                     ])
                 pd.DataFrame(summary_data).to_excel(writer, sheet_name="Synthèse", index=False)
-                
+
+                # Anomalies
                 if hasattr(result, 'anomalies') and result.anomalies:
                     anomalies_data = []
                     for a in result.anomalies:
                         anomalies_data.append({
                             "Compte": getattr(a, 'compte', ''),
+                            "Type": getattr(a, 'anomaly_type', ''),
                             "Catégorie": getattr(a.category, 'value', '') if hasattr(a, 'category') and a.category else '',
-                            "Score": round(getattr(a, 'score', 0), 2),
-                            "Description": getattr(a, 'description', ''),
+                            "Sévérité": getattr(a, 'severity', ''),
+                            "Montant": getattr(a, 'montant', 0),
+                            "Détails": getattr(a, 'details', ''),
+                            "Contexte PCG": getattr(a, 'pcg_context', ''),
+                            "Attendu": "Oui" if getattr(a, 'is_expected', False) else "Non",
+                            "Recommandation": getattr(a, 'recommendation', ''),
                         })
                     pd.DataFrame(anomalies_data).to_excel(writer, sheet_name="Anomalies", index=False)
-                
-                if hasattr(result, 'regularizations') and result.regularizations:
+
+                # Régularisations
+                if hasattr(result, 'regularization_result') and result.regularization_result:
                     reg_data = []
-                    for r in result.regularizations:
+                    for r in result.regularization_result.regularizations:
                         reg_data.append({
                             "Type": getattr(r.type, 'value', '') if hasattr(r, 'type') and r.type else '',
                             "Journal": getattr(r, 'journal', ''),
                             "Compte": getattr(r, 'compte', ''),
+                            "Libellé compte": getattr(r, 'libelle_compte', ''),
+                            "Libellé écriture": getattr(r, 'libelle', ''),
                             "Montant": getattr(r, 'montant', 0),
-                            "Libellé": getattr(r, 'libelle', ''),
+                            "Date": getattr(r, 'date', ''),
+                            "Confiance": f"{getattr(r, 'confidence', 0):.0%}",
+                            "Contexte PCG": getattr(r, 'pcg_context', ''),
                         })
                     pd.DataFrame(reg_data).to_excel(writer, sheet_name="Régularisations", index=False)
-        
+
+                # Warnings et recommandations
+                if hasattr(result, 'warnings') or hasattr(result, 'recommendations'):
+                    notes_data = []
+                    for w in getattr(result, 'warnings', []):
+                        notes_data.append({"Type": "Attention", "Message": w})
+                    for r in getattr(result, 'recommendations', []):
+                        notes_data.append({"Type": "Recommandation", "Message": r})
+                    if notes_data:
+                        pd.DataFrame(notes_data).to_excel(writer, sheet_name="Notes", index=False)
+
         return FileResponse(
             path=str(report_path),
             filename=f"rapport_gl_{job_id[:8]}.xlsx",
