@@ -104,9 +104,10 @@ sprint_6_backlog:
     - id: "STORY-028"
       title: "Migration Polars performance"
       file: "docs/stories/STORY-028-polars-migration.md"
-      status: "pending"
+      status: "completed"
       priority: "medium"
       points: 8
+      notes: "Dual-mode backend Polars/Pandas, CSV 10x plus rapide"
     - id: "STORY-029"
       title: "Amélioration affichage résultats"
       status: "completed"
