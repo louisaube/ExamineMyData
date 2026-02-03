@@ -58,7 +58,7 @@ Usage avancé:
     print(drilldown.format_drilldown_report(analysis))
 """
 
-__version__ = "2.4.0"
+__version__ = "2.6.0"
 __author__ = "GL Normalizer Team"
 
 # API publique principale
@@ -163,6 +163,31 @@ from .analyzer import (
     AnomalyCategory,
     analyze_gl,
 )
+from .secrets_manager import (
+    SecretsManager,
+    SecretType,
+    SecretValidation,
+    get_secrets_manager,
+    get_api_key,
+    setup_secrets,
+    check_ai_ready,
+)
+from .advanced_stats import (
+    MADDetector,
+    MADResult,
+    IQRDetector,
+    IQRResult,
+    SeasonalDecomposer,
+    SeasonalityResult,
+    SeasonalPattern,
+    AccountClusterer,
+    ClusterResult,
+    ClusteringSummary,
+    AccountBehaviorCluster,
+    detect_anomalies_robust,
+    analyze_seasonality,
+    cluster_accounts,
+)
 
 # Exports publics
 __all__ = [
@@ -265,6 +290,29 @@ __all__ = [
     "ContextualizedAnomaly",
     "AnomalyCategory",
     "analyze_gl",
+    # Secrets Manager
+    "SecretsManager",
+    "SecretType",
+    "SecretValidation",
+    "get_secrets_manager",
+    "get_api_key",
+    "setup_secrets",
+    "check_ai_ready",
+    # Advanced Stats
+    "MADDetector",
+    "MADResult",
+    "IQRDetector",
+    "IQRResult",
+    "SeasonalDecomposer",
+    "SeasonalityResult",
+    "SeasonalPattern",
+    "AccountClusterer",
+    "ClusterResult",
+    "ClusteringSummary",
+    "AccountBehaviorCluster",
+    "detect_anomalies_robust",
+    "analyze_seasonality",
+    "cluster_accounts",
     # AI Module
     "ai",
 ]
