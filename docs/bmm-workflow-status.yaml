@@ -163,10 +163,31 @@ sprint_7_backlog:
       nfr_ref: "WCAG 2.1 Level AAA"
       notes: "Implemented: skip link, ARIA landmarks, focus states, target sizes"
 
+# Research
+research:
+  reports_completed: 1
+  last_research_topic: "Détection anomalies financières, IA audit, faux positifs"
+  last_research_type: "mixed"
+  last_research_date: "2026-02-04"
+  total_sources: 35
+  reports:
+    - file: "docs/research-anomaly-detection-ia-audit-2026-02-04.md"
+      topic: "Anomaly Detection Best Practices"
+      type: "mixed"
+      date: "2026-02-04"
+      key_insights:
+        - "Hybrid approaches (stats + ML) achieve 98-99% accuracy"
+        - "SHAP explainability increases actionable rate to 85%"
+        - "AI reduces false positives by 50-60% vs rule-based"
+        - "Benford needs adaptive thresholds to reduce FP"
+        - "Human-in-the-loop mandatory for final qualification"
+
 # Current workflow position
 current_phase: 4
 current_step: "completed"
-next_recommended_action: "All sprints completed! Project ready for deployment or create PR."
+last_workflow: "research"
+last_workflow_date: "2026-02-04"
+next_recommended_action: "Implement research recommendations: SHAP for IF, Benford improvements, EnsembleScorer"
 
 # Notes
 notes: |
