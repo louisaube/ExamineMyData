@@ -597,10 +597,9 @@ async def download_report(job_id: str):
                             "Analytique": alert.get("analytique", ""),
                             "Univers": alert.get("univers", ""),
                             "ICC": alert.get("icc", 0),
-                            "ICC Attendu": alert.get("icc_attendu", 0),
                             "Surprise": alert.get("surprise", 0),
                             "Classification": alert.get("classification", ""),
-                            "Z-Score": alert.get("zscore", 0),
+                            "Écritures": alert.get("n_ecritures", 0),
                         })
                     if crystal_rows:
                         pd.DataFrame(crystal_rows).to_excel(writer, sheet_name="Crystal ICC", index=False)
