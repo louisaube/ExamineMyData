@@ -484,6 +484,8 @@ async def results(request: Request, job_id: str):
             "isolation_forest": result.isolation_forest if hasattr(result, 'isolation_forest') else None,
             "nlp_analysis": result.nlp_analysis if hasattr(result, 'nlp_analysis') else None,
             "combined_risk_scores": result.combined_risk_scores if hasattr(result, 'combined_risk_scores') else None,
+            # GL Crystal - Analyse topologique v2.0
+            "crystal_analysis": data.get("crystal_analysis"),
         }
 
     return templates.TemplateResponse("results.html", context)
@@ -584,6 +586,24 @@ async def download_report(job_id: str):
                         notes_data.append({"Type": "Recommandation", "Message": r})
                     if notes_data:
                         pd.DataFrame(notes_data).to_excel(writer, sheet_name="Notes", index=False)
+
+                # GL Crystal - Analyse topologique
+                crystal_data = data.get("crystal_analysis")
+                if crystal_data and crystal_data.get("top_surprises"):
+                    crystal_rows = []
+                    for alert in crystal_data["top_surprises"]:
+                        crystal_rows.append({
+                            "Compte": alert.get("compte", ""),
+                            "Analytique": alert.get("analytique", ""),
+                            "Univers": alert.get("univers", ""),
+                            "ICC": alert.get("icc", 0),
+                            "ICC Attendu": alert.get("icc_attendu", 0),
+                            "Surprise": alert.get("surprise", 0),
+                            "Classification": alert.get("classification", ""),
+                            "Z-Score": alert.get("zscore", 0),
+                        })
+                    if crystal_rows:
+                        pd.DataFrame(crystal_rows).to_excel(writer, sheet_name="Crystal ICC", index=False)
 
         return FileResponse(
             path=str(report_path),
