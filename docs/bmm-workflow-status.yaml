@@ -58,13 +58,13 @@ phase_4_implementation:
     status: "completed"
     requirement: "required"
     file: "docs/sprint-plan-gl-normalizer-2026-02-03.md"
-    current_sprint: 7
-    total_sprints: 7
+    current_sprint: 8
+    total_sprints: 8
   stories:
-    total: 33
+    total: 37
     completed: 33
     in_progress: 0
-    pending: 0
+    pending: 4
     completed_stories:
       # Sprint 1 - Fondations
       - "STORY-000: Setup projet (CI GitHub Actions) [NEW]"
@@ -182,12 +182,43 @@ research:
         - "Benford needs adaptive thresholds to reduce FP"
         - "Human-in-the-loop mandatory for final qualification"
 
+# Sprint 8 - AI Improvements (NEW)
+sprint_8_backlog:
+  status: "not_started"
+  goal: "Améliorer l'efficacité IA et réduire les faux positifs"
+  research_ref: "docs/research-anomaly-detection-ia-audit-2026-02-04.md"
+  stories:
+    - id: "STORY-034"
+      title: "SHAP Explainability pour Isolation Forest"
+      status: "not_started"
+      priority: "must"
+      points: 5
+      research_insight: "SHAP explainability increases actionable rate to 85%"
+    - id: "STORY-035"
+      title: "Amélioration Benford (2ème chiffre + seuils adaptatifs)"
+      status: "not_started"
+      priority: "must"
+      points: 5
+      research_insight: "Benford needs adaptive thresholds to reduce FP"
+    - id: "STORY-036"
+      title: "EnsembleAnomalyScorer"
+      status: "not_started"
+      priority: "should"
+      points: 8
+      research_insight: "Hybrid approaches (stats + ML) achieve 98-99% accuracy"
+    - id: "STORY-037"
+      title: "Dashboard Métriques"
+      status: "not_started"
+      priority: "should"
+      points: 5
+      research_insight: "Metrics: F1, Precision, Recall instead of accuracy"
+
 # Current workflow position
 current_phase: 4
-current_step: "completed"
-last_workflow: "research"
+current_step: "sprint_8_planning"
+last_workflow: "sprint-planning"
 last_workflow_date: "2026-02-04"
-next_recommended_action: "Implement research recommendations: SHAP for IF, Benford improvements, EnsembleScorer"
+next_recommended_action: "Start Sprint 8: /dev-story STORY-034"
 
 # Notes
 notes: |
@@ -254,4 +285,15 @@ notes: |
   - templates/results.html: "Qualifier les anomalies" button
   - All 74 core tests passing
 
-  🎉 PROJECT COMPLETE: All 33 stories implemented across 7 sprints!
+  🎉 PROJECT v2.6.0 COMPLETE: All 33 stories implemented across 7 sprints!
+
+  Session 8 - Sprint Planning (Sprint 8):
+  - Research-driven sprint based on anomaly detection best practices
+  - Added 4 new stories for AI improvements:
+    - STORY-034: SHAP Explainability (5 points)
+    - STORY-035: Benford Improvements (5 points)
+    - STORY-036: EnsembleAnomalyScorer (8 points)
+    - STORY-037: Dashboard Métriques (5 points)
+  - Total Sprint 8: 23 points
+  - Epic: EPIC-008 AI Improvements
+  - Goal: Réduire faux positifs de 50%, améliorer explicabilité

@@ -959,9 +959,180 @@ Pour qu'une story soit considérée complète :
 | Sprint 4 | Completed | Sécurité tokens | 6 |
 | Sprint 5 | Completed | Algorithmes avancés | 16 |
 | Sprint 6 | Completed | UX + Performance | 18 |
-| Sprint 7 | **Current** | UX Screens (Mapping + Qualification) | 18 |
+| Sprint 7 | Completed | UX Screens (Mapping + Qualification) | 18 |
+| Sprint 8 | **Current** | IA Improvements + Réduction Faux Positifs | 23 |
+
+---
+
+## Sprint 8 (Semaines 15-16) - 23 points
+
+**Goal:** Améliorer l'efficacité de l'IA et réduire les faux positifs basé sur la recherche
+
+**Research Reference:** `docs/research-anomaly-detection-ia-audit-2026-02-04.md`
+
+| Story | Description | Points | Priority |
+|-------|-------------|--------|----------|
+| STORY-034 | SHAP Explainability pour Isolation Forest | 5 | Must |
+| STORY-035 | Amélioration Benford (2ème chiffre + seuils adaptatifs) | 5 | Must |
+| STORY-036 | EnsembleAnomalyScorer | 8 | Should |
+| STORY-037 | Dashboard Métriques | 5 | Should |
+
+**Total:** 23 points / 35 capacity (66%)
+
+**Deliverables Sprint 8:**
+- SHAP values pour toutes les anomalies Isolation Forest
+- Benford amélioré avec moins de faux positifs
+- Scoring ensemble combinant tous les détecteurs
+- Page `/metrics` avec F1, Precision, Recall
+
+**Research Insights Applied:**
+- "SHAP explainability increases actionable rate to 85%"
+- "Benford needs adaptive thresholds to reduce FP"
+- "Hybrid approaches (stats + ML) achieve 98-99% accuracy"
+
+---
+
+## New Stories (Sprint 8)
+
+### STORY-034: SHAP Explainability pour Isolation Forest
+
+**Epic:** EPIC-008 AI Improvements
+**Priority:** Must Have
+**Points:** 5
+**Research Ref:** Insight 2 - "Explicabilité critique"
+
+**User Story:**
+En tant que DAF,
+Je veux comprendre pourquoi une anomalie a été détectée,
+Afin de prendre des décisions éclairées sur sa qualification.
+
+**Acceptance Criteria:**
+- [ ] Intégration SHAP TreeExplainer pour Isolation Forest
+- [ ] Calcul des top 3 features contributives par anomalie
+- [ ] Affichage dans l'UI Qualification (contexte étendu)
+- [ ] Format: "Cette anomalie est due à: montant élevé (45%), mois inhabituel (30%), compte rare (25%)"
+- [ ] Performance: < 2s pour 100 anomalies
+
+**Technical Notes:**
+- Fichier: `src/ai/isolation_forest.py`
+- Package: `shap` (ajouter à requirements.txt)
+- Méthode: `explain_anomaly(anomaly_id) -> Dict[str, float]`
+- UI: Ajouter section "Pourquoi cette anomalie?" dans qualification.html
+
+**Dependencies:** STORY-020 (Isolation Forest existant)
+
+---
+
+### STORY-035: Amélioration Benford (2ème chiffre + seuils adaptatifs)
+
+**Epic:** EPIC-008 AI Improvements
+**Priority:** Must Have
+**Points:** 5
+**Research Ref:** Insight 3 - "Benford génère trop de faux positifs seul"
+
+**User Story:**
+En tant que DAF,
+Je veux une analyse Benford plus précise,
+Afin de réduire les faux positifs dus aux seuils comptables.
+
+**Acceptance Criteria:**
+- [ ] Analyse du 2ème chiffre (souvent négligé, 30% oversight rate)
+- [ ] Seuil adaptatif basé sur log-normal cutoff
+- [ ] Filtrage des montants affectés par seuils comptables (5000€, 10000€)
+- [ ] Combinaison 1er + 2ème chiffre pour score final
+- [ ] Réduction faux positifs de 30-50% (à mesurer)
+
+**Technical Notes:**
+- Fichier: `src/ai/benford.py`
+- Nouvelle méthode: `analyze_second_digit(amounts)`
+- Nouvelle méthode: `apply_adaptive_threshold(amounts, cutoff_factor=0.05)`
+- Test: Comparer FP avant/après sur dataset test
+
+**Dependencies:** STORY-019 (Benford existant)
+
+---
+
+### STORY-036: EnsembleAnomalyScorer
+
+**Epic:** EPIC-008 AI Improvements
+**Priority:** Should Have
+**Points:** 8
+**Research Ref:** Insight 1 - "Approche hybride incontournable"
+
+**User Story:**
+En tant que DAF,
+Je veux un score d'anomalie combinant toutes les méthodes,
+Afin d'avoir une vue unifiée et plus fiable.
+
+**Acceptance Criteria:**
+- [ ] Agrège scores de: Benford, Z-score, MAD, IQR, Isolation Forest
+- [ ] Normalisation des scores sur échelle 0-100
+- [ ] Stratégies de voting configurables: unanime, majorité, weighted
+- [ ] Poids par défaut basés sur recherche (IF: 0.3, MAD: 0.25, Benford: 0.2, Z-score: 0.15, IQR: 0.1)
+- [ ] Score final avec confidence level (High/Medium/Low)
+- [ ] API: `ensemble_score(transaction) -> (score: float, confidence: str, details: dict)`
+
+**Technical Notes:**
+- Nouveau fichier: `src/ai/ensemble_scorer.py`
+- Classe: `EnsembleAnomalyScorer`
+- Configurable via YAML: `config/ensemble_weights.yaml`
+- Intégration dans `Analyzer` existant
+
+**Dependencies:** Tous les détecteurs existants (STORY-005, 019, 020, 024)
+
+---
+
+### STORY-037: Dashboard Métriques
+
+**Epic:** EPIC-008 AI Improvements
+**Priority:** Should Have
+**Points:** 5
+**Research Ref:** Insight 4 - "Métriques actuelles inadaptées"
+
+**User Story:**
+En tant que DAF,
+Je veux voir les métriques de performance de l'outil,
+Afin de comprendre son efficacité et l'améliorer.
+
+**Acceptance Criteria:**
+- [ ] Nouvelle page `/metrics/<job_id>`
+- [ ] Affichage: Precision, Recall, F1-Score (si données labellisées disponibles)
+- [ ] Affichage: Nb anomalies détectées, Nb qualifiées, Taux actionnable
+- [ ] Graphique distribution des scores d'anomalie
+- [ ] Export des métriques en JSON
+- [ ] Bouton "Contribuer feedback" pour améliorer le modèle
+
+**Technical Notes:**
+- Fichier template: `templates/metrics.html`
+- Route: `GET /metrics/<job_id>`
+- API: `GET /api/metrics/<job_id>`
+- Utilise qualifications pour calculer taux actionnable
+- Si pas de labels: afficher métriques partielles
+
+**Dependencies:** Qualification UI (STORY-032), EnsembleScorer (STORY-036)
+
+---
+
+## Next Steps
+
+**Current:** Sprint 8 - AI Improvements
+
+**Stories à implémenter:**
+1. `STORY-034` - SHAP Explainability (5 points) - Must
+2. `STORY-035` - Benford Improvements (5 points) - Must
+3. `STORY-036` - EnsembleAnomalyScorer (8 points) - Should
+4. `STORY-037` - Dashboard Métriques (5 points) - Should
+
+```bash
+# Pour commencer l'implémentation:
+/dev-story STORY-034
+```
+
+**Sprint cadence:**
+- Sprint length: 2 semaines
+- Sprint 8 goal: Réduction faux positifs + Explicabilité IA
 
 ---
 
 *Document généré par BMAD Method v6 - Phase 4 Implementation Planning*
-*Dernière mise à jour: 2026-02-03*
+*Dernière mise à jour: 2026-02-04*
