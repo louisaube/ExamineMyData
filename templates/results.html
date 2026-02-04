@@ -320,6 +320,105 @@
     </div>
     {% endif %}
 
+    <!-- GL Crystal - Analyse topologique v2.0 -->
+    {% if crystal_analysis %}
+    <div class="crystal-section">
+        <h3>
+            <span class="crystal-icon">💎</span>
+            Analyse Topologique Crystal
+            <span class="badge badge-info">v2.0</span>
+        </h3>
+        <p class="section-intro">
+            Analyse de la cristallinité comptable : régularité des patterns dans le Grand Livre.
+        </p>
+
+        <!-- Métriques Crystal -->
+        <div class="crystal-metrics">
+            <div class="crystal-metric">
+                <span class="metric-value">{{ crystal_analysis.n_couples }}</span>
+                <span class="metric-label">Couples analysés</span>
+            </div>
+            <div class="crystal-metric metric-success">
+                <span class="metric-value">{{ crystal_analysis.n_cristallins }}</span>
+                <span class="metric-label">Cristallins</span>
+                <small>ICC ≥ 0.7</small>
+            </div>
+            <div class="crystal-metric metric-warning">
+                <span class="metric-value">{{ crystal_analysis.n_amorphes }}</span>
+                <span class="metric-label">Amorphes</span>
+                <small>ICC &lt; 0.4</small>
+            </div>
+            <div class="crystal-metric {% if crystal_analysis.n_alertes_surprise > 0 %}metric-danger{% else %}metric-success{% endif %}">
+                <span class="metric-value">{{ crystal_analysis.n_alertes_surprise }}</span>
+                <span class="metric-label">Alertes surprise</span>
+                <small>Comportement inattendu</small>
+            </div>
+        </div>
+
+        <!-- Répartition par univers sémantique -->
+        {% if crystal_analysis.univers_distribution %}
+        <div class="univers-distribution">
+            <h4>Répartition par univers sémantique</h4>
+            <div class="univers-bars">
+                {% for univers, data in crystal_analysis.univers_distribution.items() %}
+                <div class="univers-bar">
+                    <span class="univers-name univers-{{ univers|lower }}">{{ univers }}</span>
+                    <div class="bar-container">
+                        <div class="bar-fill" style="width: {{ data.pct }}%"></div>
+                    </div>
+                    <span class="univers-count">{{ data.count }} ({{ "%.1f"|format(data.pct) }}%)</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Top alertes (surprises) -->
+        {% if crystal_analysis.top_surprises %}
+        <div class="crystal-alerts">
+            <h4>Top couples surprenants</h4>
+            <p class="alert-explanation">
+                Couples dont le comportement dévie de l'attendu pour leur univers sémantique.
+            </p>
+            <table class="data-table crystal-table">
+                <thead>
+                    <tr>
+                        <th>Compte</th>
+                        <th>Analytique</th>
+                        <th>Univers</th>
+                        <th>ICC</th>
+                        <th>Surprise</th>
+                        <th>Type</th>
+                        <th>Écritures</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in crystal_analysis.top_surprises %}
+                    <tr class="crystal-{{ alert.classification }}">
+                        <td><strong>{{ alert.compte }}</strong></td>
+                        <td>{{ alert.analytique }}</td>
+                        <td>
+                            <span class="univers-badge univers-{{ alert.univers|lower }}">
+                                {{ alert.univers }}
+                            </span>
+                        </td>
+                        <td class="icc-value">{{ "%.2f"|format(alert.icc) }}</td>
+                        <td class="surprise-value">{{ "%.2f"|format(alert.surprise) }}</td>
+                        <td>
+                            <span class="crystal-badge crystal-{{ alert.classification }}">
+                                {{ alert.classification|capitalize }}
+                            </span>
+                        </td>
+                        <td>{{ alert.n_ecritures }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Régularisations -->
     {% if regularizations %}
     <div class="regularizations-section">
@@ -829,6 +928,193 @@ tr.severity-high { background: #ffe5d0; }
     font-size: 0.9rem;
     color: #495057;
 }
+
+/* GL Crystal - Analyse topologique */
+.crystal-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 12px;
+    border: 2px solid #dee2e6;
+}
+
+.crystal-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.crystal-icon {
+    font-size: 1.3em;
+}
+
+.crystal-section .section-intro {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+}
+
+/* Métriques Crystal */
+.crystal-metrics {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.crystal-metric {
+    flex: 1;
+    min-width: 130px;
+    padding: 1rem;
+    background: white;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-left: 4px solid #6c757d;
+}
+
+.crystal-metric.metric-success { border-left-color: #28a745; }
+.crystal-metric.metric-warning { border-left-color: #ffc107; }
+.crystal-metric.metric-danger { border-left-color: #dc3545; }
+
+.crystal-metric .metric-value {
+    display: block;
+    font-size: 2rem;
+    font-weight: bold;
+    color: #212529;
+}
+
+.crystal-metric .metric-label {
+    display: block;
+    font-size: 0.9rem;
+    color: #495057;
+    margin-top: 0.25rem;
+}
+
+.crystal-metric small {
+    display: block;
+    font-size: 0.75rem;
+    color: #868e96;
+    margin-top: 0.25rem;
+}
+
+/* Répartition par univers */
+.univers-distribution {
+    margin: 1.5rem 0;
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+}
+
+.univers-distribution h4 {
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+.univers-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.univers-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.univers-name {
+    width: 100px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: right;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    color: white;
+}
+
+.univers-cristallin { background: #28a745; }
+.univers-nominatif { background: #007bff; }
+.univers-inventaire { background: #6f42c1; }
+.univers-ventilation { background: #fd7e14; }
+.univers-composite { background: #dc3545; }
+.univers-non_classe { background: #6c757d; }
+
+.bar-container {
+    flex: 1;
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #28a745);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.univers-count {
+    width: 100px;
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+/* Alertes Crystal */
+.crystal-alerts {
+    margin-top: 1.5rem;
+}
+
+.crystal-alerts h4 {
+    margin-bottom: 0.5rem;
+    color: #495057;
+}
+
+.alert-explanation {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.crystal-table {
+    background: white;
+}
+
+.crystal-table th {
+    background: #495057;
+    color: white;
+}
+
+.icc-value, .surprise-value {
+    font-family: monospace;
+    font-weight: bold;
+}
+
+.crystal-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.crystal-badge.crystal-cristallin { background: #d4edda; color: #155724; }
+.crystal-badge.crystal-vitreux { background: #fff3cd; color: #856404; }
+.crystal-badge.crystal-amorphe { background: #f8d7da; color: #721c24; }
+
+.univers-badge {
+    display: inline-block;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+}
+
+tr.crystal-cristallin { background: #d4edda; }
+tr.crystal-vitreux { background: #fff3cd; }
+tr.crystal-amorphe { background: #f8d7da; }
 </style>
 
 <script>

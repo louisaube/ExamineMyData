@@ -33,6 +33,11 @@ from gl_normalizer.autonomous_drilldown import (
     run_autonomous_analysis,
 )
 
+# GL Crystal - Analyse topologique v2.0
+from gl_crystal import SemanticClassifier, UniversSemantique
+from gl_crystal.normalizer import GLSchema, GLEntry, GLEnricher
+from gl_crystal.layer1_crystallinity import ICCCalculator
+
 app = FastAPI(title="GL Normalizer", description="Analyse et normalisation du P&L")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -96,6 +101,144 @@ class AnalysisCache:
 analysis_cache = AnalysisCache(ttl=CACHE_TTL_SECONDS)
 
 
+def run_crystal_analysis(df: pd.DataFrame, year: int) -> Optional[Dict[str, Any]]:
+    """
+    Exécute l'analyse GL Crystal (topologique) sur le DataFrame.
+
+    Returns:
+        Dictionnaire avec les résultats Crystal ou None si erreur
+    """
+    try:
+        from datetime import date
+
+        # Conversion DataFrame -> GLSchema
+        entries = []
+        for _, row in df.iterrows():
+            try:
+                # Extraction des colonnes (compatible avec différents formats)
+                compte = str(row.get('Compte', row.get('compte', row.get('COMPTE', ''))))
+                if not compte:
+                    continue
+
+                # Date
+                date_val = row.get('Date', row.get('date', row.get('DATE', None)))
+                if pd.isna(date_val):
+                    date_ecriture = date(year, 1, 1)
+                elif isinstance(date_val, str):
+                    from datetime import datetime
+                    try:
+                        date_ecriture = datetime.strptime(date_val[:10], '%Y-%m-%d').date()
+                    except ValueError:
+                        date_ecriture = date(year, 1, 1)
+                else:
+                    date_ecriture = date_val.date() if hasattr(date_val, 'date') else date(year, 1, 1)
+
+                # Autres champs
+                journal = str(row.get('Journal', row.get('journal', row.get('JOURNAL', 'OD'))))
+                libelle = str(row.get('Libelle', row.get('libelle', row.get('LIBELLE', ''))))
+                piece = str(row.get('Piece', row.get('piece', row.get('PIECE', ''))))
+
+                # Montants
+                debit = float(row.get('Debit', row.get('debit', row.get('DEBIT', 0)) or 0))
+                credit = float(row.get('Credit', row.get('credit', row.get('CREDIT', 0)) or 0))
+
+                # Analytique (si disponible)
+                analytique = row.get('Analytique', row.get('analytique', row.get('ANALYTIQUE', None)))
+                if pd.isna(analytique):
+                    analytique = None
+                else:
+                    analytique = str(analytique) if analytique else None
+
+                entry = GLEntry(
+                    date_ecriture=date_ecriture,
+                    piece=piece[:50] if piece else '',
+                    journal_code=journal[:10] if journal else 'OD',
+                    journal_libelle='',
+                    compte_general=compte[:10] if compte else '',
+                    compte_libelle='',
+                    compte_auxiliaire=None,
+                    libelle_ecriture=libelle[:200] if libelle else '',
+                    debit=debit,
+                    credit=credit,
+                    analytique=analytique,
+                    ligne_id=len(entries),
+                )
+                entries.append(entry)
+            except Exception:
+                continue
+
+        if len(entries) < 10:
+            return None
+
+        # Crée le schéma
+        schema = GLSchema(
+            source_file='uploaded_file',
+            source_format='generic',
+            date_extraction=date.today(),
+            entries=entries,
+        )
+        schema.compute_stats()
+
+        # Enrichissement
+        enricher = GLEnricher()
+        enriched = enricher.enrich(schema)
+
+        # Classification sémantique (Layer 0)
+        classifier = SemanticClassifier(min_ecritures=3)
+        classification = classifier.classify(enriched)
+
+        # Calcul ICC avec classification (Layer 1)
+        calculator = ICCCalculator(use_univers_weights=True)
+        icc_results = calculator.compute(enriched, classification=classification)
+
+        # Prépare les résultats pour l'affichage
+        stats = icc_results.get_stats()
+
+        # Top alertes (surprises)
+        top_surprises = []
+        for score in icc_results.top_surprises(n=10):
+            top_surprises.append({
+                'compte': score.compte,
+                'analytique': score.analytique or '-',
+                'icc': score.icc,
+                'univers': score.univers.value if score.univers else 'NON_CLASSE',
+                'surprise': score.surprise or 0,
+                'classification': score.classification,
+                'n_ecritures': score.n_ecritures,
+            })
+
+        # Répartition par univers
+        univers_distribution = {}
+        for univers in UniversSemantique:
+            scores = icc_results.get_by_univers(univers)
+            if scores:
+                univers_distribution[univers.value] = {
+                    'count': len(scores),
+                    'pct': len(scores) / len(icc_results.scores) * 100 if icc_results.scores else 0,
+                }
+
+        # Classification summary
+        classification_summary = classification.summary.to_dict() if classification.summary else {}
+
+        return {
+            'n_couples': stats.get('n_couples', 0),
+            'icc_mean': stats.get('icc_mean', 0),
+            'icc_std': stats.get('icc_std', 0),
+            'n_cristallins': stats.get('n_cristallins', 0),
+            'n_amorphes': stats.get('n_amorphes', 0),
+            'n_alertes_surprise': stats.get('n_alertes_surprise', 0),
+            'top_surprises': top_surprises,
+            'univers_distribution': univers_distribution,
+            'classification_summary': classification_summary,
+            'has_classification': True,
+        }
+
+    except Exception as e:
+        # Log error but don't fail the main analysis
+        print(f"Crystal analysis error: {e}")
+        return None
+
+
 def save_upload(file: UploadFile) -> Path:
     validate_file_extension(file.filename)
     file_id = str(uuid.uuid4())
@@ -147,11 +290,18 @@ def run_analysis_background(job_id: str, path1: Path, year1: int, path2: Optiona
             analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Calcul du run rate...", 80)
 
             # STORY-030: Analyse autonome IA (drill-down proactif)
-            analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Analyse proactive IA...", 90)
+            analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Analyse proactive IA...", 85)
             try:
                 autonomous_analysis = run_autonomous_analysis(df1, auto_execute=False)
             except Exception:
                 autonomous_analysis = None
+
+            # GL Crystal - Analyse topologique v2.0
+            analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Analyse topologique Crystal...", 95)
+            try:
+                crystal_analysis = run_crystal_analysis(df1, year1)
+            except Exception:
+                crystal_analysis = None
 
             analysis_cache.set(job_id, {
                 "type": "single",
@@ -161,6 +311,7 @@ def run_analysis_background(job_id: str, path1: Path, year1: int, path2: Optiona
                 "path": str(path1),
                 "df": df1,
                 "autonomous_analysis": autonomous_analysis,
+                "crystal_analysis": crystal_analysis,
                 "message": "Analyse terminée",
                 "progress": 100,
             })
@@ -322,6 +473,8 @@ async def results(request: Request, job_id: str):
             "recommendations": result.recommendations[:5] if hasattr(result, 'recommendations') else [],
             # STORY-030: Analyse autonome IA
             "autonomous_analysis": data.get("autonomous_analysis"),
+            # GL Crystal - Analyse topologique
+            "crystal_analysis": data.get("crystal_analysis"),
         }
 
     return templates.TemplateResponse("results.html", context)
@@ -795,11 +948,18 @@ def run_analysis_with_mapping(job_id: str, path: Path, year: int, column_mapping
         analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Calcul du run rate...", 80)
 
         # Analyse autonome IA
-        analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Analyse proactive IA...", 90)
+        analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Analyse proactive IA...", 85)
         try:
             autonomous_analysis = run_autonomous_analysis(df, auto_execute=False)
         except Exception:
             autonomous_analysis = None
+
+        # GL Crystal - Analyse topologique v2.0
+        analysis_cache.update_status(job_id, JobStatus.ANALYZING, "Analyse topologique Crystal...", 95)
+        try:
+            crystal_analysis = run_crystal_analysis(df, year)
+        except Exception:
+            crystal_analysis = None
 
         analysis_cache.set(job_id, {
             "type": "single",
@@ -810,6 +970,7 @@ def run_analysis_with_mapping(job_id: str, path: Path, year: int, column_mapping
             "df": df,
             "column_mapping": column_mapping,
             "autonomous_analysis": autonomous_analysis,
+            "crystal_analysis": crystal_analysis,
             "message": "Analyse terminee",
             "progress": 100,
         })
