@@ -38,6 +38,12 @@ from gl_crystal import SemanticClassifier, UniversSemantique
 from gl_crystal.normalizer import GLSchema, GLEntry, GLEnricher
 from gl_crystal.layer1_crystallinity import ICCCalculator
 
+# New Layers (v2) - Statistical pipeline
+from gl_normalizer.layer1 import LabelParser, enrich_anomalies
+from gl_normalizer.layer2 import Layer2Runner, RawSignal, Univers as Layer2Univers
+from gl_normalizer.layer3 import Layer3Runner, QualifiedAnomaly, Layer3Result
+from gl_normalizer.layer4 import ICCScorer, ICCResult
+
 app = FastAPI(title="GL Normalizer", description="Analyse et normalisation du P&L")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -339,6 +345,95 @@ def run_crystal_analysis(df: pd.DataFrame, year: int) -> Optional[Dict[str, Any]
         # Classification summary
         classification_summary = classification.summary.to_dict() if classification.summary else {}
 
+        # =================================================================
+        # NEW LAYERS (v2) - Statistical pipeline
+        # =================================================================
+        layer_pipeline_results = None
+        try:
+            # Build referentiel from classification results
+            referentiel = _build_referentiel_from_classification(classification)
+
+            # Prepare DataFrame for Layer 2 (needs: famille, periode, montant)
+            layer2_df = _prepare_layer2_dataframe(work_df)
+
+            # Determine analysis mode from layer2_df
+            analysis_mode = 'temporal'
+            if layer2_df is not None and 'periode' in layer2_df.columns:
+                if (layer2_df['periode'] == 'AGG').all():
+                    analysis_mode = 'aggregated'
+
+            if layer2_df is not None and len(layer2_df) > 0 and len(referentiel) > 0:
+                # Run Layer 2: Statistical tests → raw signals
+                layer2_runner = Layer2Runner(referentiel, fdr_alpha=0.05)
+                layer2_result = layer2_runner.run(layer2_df)
+
+                # Enrich signals with libelle from source data for Layer 1
+                if 'libelle' in layer2_df.columns:
+                    libelle_by_famille = layer2_df.groupby('famille')['libelle'].first().to_dict()
+                    for signal in layer2_result.significant_signals:
+                        if hasattr(signal, 'metadata') and signal.famille in libelle_by_famille:
+                            signal.metadata['libelle'] = libelle_by_famille[signal.famille]
+
+                # Run Layer 3: Business filters → qualified anomalies
+                layer3_runner = Layer3Runner(referentiel)
+                layer3_result = layer3_runner.run(layer2_result.significant_signals, gl_data=layer2_df)
+
+                # Run Layer 1: Label Parser → enrich anomalies with semantic data
+                enriched_anomalies = layer3_result.qualified
+                if enriched_anomalies:
+                    try:
+                        def get_libelle(anomaly):
+                            """Extract libelle from signal metadata (primary source)."""
+                            if hasattr(anomaly.signal, 'metadata') and anomaly.signal.metadata:
+                                return anomaly.signal.metadata.get('libelle', '')
+                            return ''
+                        
+                        enriched_anomalies = enrich_anomalies(layer3_result.qualified, get_libelle)
+                        n_enriched = sum(1 for a in enriched_anomalies 
+                                        if hasattr(a.signal, 'metadata') and 'parsed_label' in a.signal.metadata)
+                        print(f"Layer 1: enriched {n_enriched}/{len(enriched_anomalies)} anomalies with labels")
+                    except Exception as e:
+                        print(f"Layer 1 enrichment warning: {e}")
+
+                # Run Layer 4: ICC Score
+                icc_scorer = ICCScorer()
+                icc_result = icc_scorer.score(enriched_anomalies)
+
+                layer_pipeline_results = {
+                    'analysis_mode': analysis_mode,
+                    'layer2': {
+                        'n_signals': layer2_result.n_total,
+                        'n_significant': layer2_result.n_significant,
+                        'reduction_pct': 100 * (1 - layer2_result.n_significant / max(layer2_result.n_total, 1)),
+                        'methods': layer2_result.methods_used,
+                    },
+                    'layer3': {
+                        'n_qualified': len(layer3_result.qualified),
+                        'n_filtered': len(layer3_result.filtered),
+                        'reduction_pct': layer3_result.reduction_rate * 100 if hasattr(layer3_result, 'reduction_rate') else 0,
+                    },
+                    'layer4': {
+                        'global_score': icc_result.global_score,
+                        'level': icc_result.level.value if hasattr(icc_result.level, 'value') else str(icc_result.level),
+                        'n_anomalies': len(icc_result.anomalies) if hasattr(icc_result, 'anomalies') else 0,
+                        'univers_scores': {k: v.score for k, v in icc_result.univers_scores.items()} if hasattr(icc_result, 'univers_scores') else {},
+                    },
+                    'top_qualified': [
+                        {
+                            'rank': a.rank,
+                            'famille': a.signal.famille if hasattr(a.signal, 'famille') else '',
+                            'pertinence': a.pertinence_score,
+                            'impact': a.impact.total if hasattr(a, 'impact') and a.impact else 0,
+                        }
+                        for a in layer3_result.qualified[:5]
+                    ],
+                }
+                print(f"Layer pipeline: L2={layer2_result.n_significant} signals → L3={len(layer3_result.qualified)} anomalies → L4 score={icc_result.global_score:.1f}")
+
+        except Exception as e:
+            print(f"Layer pipeline error (non-blocking): {e}")
+            layer_pipeline_results = None
+
         return {
             'n_couples': stats.get('n_couples', 0),
             'icc_mean': stats.get('icc_mean', 0),
@@ -350,12 +445,141 @@ def run_crystal_analysis(df: pd.DataFrame, year: int) -> Optional[Dict[str, Any]
             'univers_distribution': univers_distribution,
             'classification_summary': classification_summary,
             'has_classification': True,
+            'layer_pipeline': layer_pipeline_results,
         }
 
     except Exception as e:
         # Log error but don't fail the main analysis
         print(f"Crystal analysis error: {e}")
+        import traceback
+        traceback.print_exc()
         return None
+
+
+def _build_referentiel_from_classification(classification) -> Dict[str, Any]:
+    """Build referentiel dictionary from Layer 0 classification results.
+    
+    Provides metadata needed by Layer 2-4 pipeline:
+    - univers: semantic universe from Layer 0 classification
+    - cv_montant: coefficient of variation (threshold for volatility)
+    - n_ecritures: number of entries (used for materiality)
+    - signal_si: list of universes that should generate signals (default: all)
+    - non_signal_si: list of universes that should NOT generate signals (default: none)
+    - materiality_threshold: minimum amount to consider (default: 1000)
+    """
+    referentiel = {}
+    if not classification or not hasattr(classification, 'results'):
+        return referentiel
+
+    # Universes that typically indicate anomalies
+    signal_universes = {'EXCEPTIONNEL', 'FISCAL', 'TRESORERIE'}
+    # Universes that are expected to be stable (less likely anomalies)
+    non_signal_universes = {'RECURRENT'}
+
+    for result in classification.results:
+        compte = result.compte if hasattr(result, 'compte') else str(result)
+        univers = result.univers.value if hasattr(result, 'univers') and result.univers else 'COMPOSITE'
+        n_ecritures = getattr(result, 'n_ecritures', 0)
+        cv_montant = getattr(result, 'cv_montant', 0.3)
+        
+        # Materiality threshold based on entry count
+        materiality = 1000 if n_ecritures > 10 else 500
+        
+        referentiel[compte] = {
+            'univers': univers,
+            'cv_montant': cv_montant,
+            'n_ecritures': n_ecritures,
+            'signal_si': list(signal_universes),
+            'non_signal_si': list(non_signal_universes),
+            'materiality_threshold': materiality,
+            'is_signal_universe': univers in signal_universes,
+        }
+
+    return referentiel
+
+
+def _prepare_layer2_dataframe(work_df: pd.DataFrame) -> Optional[pd.DataFrame]:
+    """Prepare DataFrame for Layer 2 with required columns.
+    
+    Required columns: famille (compte), periode (YYYY-MM), montant
+    Optional columns: journal, libelle
+    
+    Handles:
+    - Missing dates (derives period from filename or uses current year)
+    - Signed amounts (uses montant column if available, else debit-credit)
+    - Type coercion for safety
+    """
+    if work_df is None or len(work_df) == 0:
+        return None
+
+    # Validate required column
+    if 'compte' not in work_df.columns:
+        print("Layer 2 prep warning: 'compte' column missing")
+        return None
+
+    layer2_df = pd.DataFrame()
+
+    # famille = compte
+    layer2_df['famille'] = work_df['compte'].astype(str)
+
+    # periode from date - try multiple approaches with fallback
+    periode_set = False
+    temporal_mode = True  # True = full temporal analysis, False = aggregated mode
+    
+    if 'date' in work_df.columns:
+        try:
+            dates = pd.to_datetime(work_df['date'], errors='coerce')
+            valid_dates = dates.notna()
+            valid_pct = valid_dates.sum() / len(dates) if len(dates) > 0 else 0
+            
+            if valid_pct > 0.5:  # >50% valid dates - proceed with temporal analysis
+                layer2_df['periode'] = dates.dt.strftime('%Y-%m')
+                # Fill missing with most common period
+                mode_period = layer2_df['periode'].mode()
+                if len(mode_period) > 0:
+                    layer2_df['periode'] = layer2_df['periode'].fillna(mode_period.iloc[0])
+                periode_set = True
+                print(f"Layer 2: {valid_pct*100:.0f}% dates valid, temporal analysis enabled")
+            else:
+                print(f"Layer 2: only {valid_pct*100:.0f}% dates valid, using aggregated mode")
+                temporal_mode = False
+        except Exception as e:
+            print(f"Layer 2 date parsing warning: {e}, using aggregated mode")
+            temporal_mode = False
+
+    if not periode_set:
+        # No date column or invalid dates - use single-period aggregation
+        # This allows statistical analysis on amount distributions without temporal structure
+        layer2_df['periode'] = 'AGG'  # Special marker for aggregated mode
+        temporal_mode = False
+        print("Layer 2: no temporal data, using aggregated analysis mode")
+
+    # montant - check for pre-signed amount column first
+    if 'montant' in work_df.columns:
+        layer2_df['montant'] = pd.to_numeric(work_df['montant'], errors='coerce').fillna(0)
+    else:
+        # Calculate net from debit/credit
+        debit = work_df.get('debit', pd.Series([0] * len(work_df)))
+        credit = work_df.get('credit', pd.Series([0] * len(work_df)))
+        if isinstance(debit, pd.Series):
+            debit = pd.to_numeric(debit, errors='coerce').fillna(0)
+        else:
+            debit = 0
+        if isinstance(credit, pd.Series):
+            credit = pd.to_numeric(credit, errors='coerce').fillna(0)
+        else:
+            credit = 0
+        layer2_df['montant'] = debit - credit
+
+    # Optional columns for enrichment
+    if 'journal' in work_df.columns:
+        layer2_df['journal'] = work_df['journal'].astype(str)
+    if 'libelle' in work_df.columns:
+        layer2_df['libelle'] = work_df['libelle'].astype(str)
+    if 'piece' in work_df.columns:
+        layer2_df['piece'] = work_df['piece'].astype(str)
+
+    return layer2_df
 
 
 def save_upload(file: UploadFile) -> Path:

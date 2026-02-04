@@ -609,6 +609,76 @@
             </table>
         </div>
         {% endif %}
+
+        <!-- NEW: Layer Pipeline Results (v2) -->
+        {% if crystal_analysis.layer_pipeline %}
+        <div class="layer-pipeline-section">
+            <h4>Pipeline Statistique (v2)
+                {% if crystal_analysis.layer_pipeline.analysis_mode == 'aggregated' %}
+                <span class="mode-badge aggregated">Mode Agrégé</span>
+                {% else %}
+                <span class="mode-badge temporal">Mode Temporel</span>
+                {% endif %}
+            </h4>
+            <div class="pipeline-flow">
+                <!-- Layer 2 -->
+                <div class="pipeline-step">
+                    <div class="step-header">Layer 2 - Tests Statistiques</div>
+                    <div class="step-metrics">
+                        <span class="metric">{{ crystal_analysis.layer_pipeline.layer2.n_signals }} signaux bruts</span>
+                        <span class="metric highlight">→ {{ crystal_analysis.layer_pipeline.layer2.n_significant }} significatifs</span>
+                        <span class="metric reduction">-{{ "%.0f"|format(crystal_analysis.layer_pipeline.layer2.reduction_pct) }}%</span>
+                    </div>
+                </div>
+                <!-- Layer 3 -->
+                <div class="pipeline-step">
+                    <div class="step-header">Layer 3 - Filtres Métier</div>
+                    <div class="step-metrics">
+                        <span class="metric highlight">{{ crystal_analysis.layer_pipeline.layer3.n_qualified }} anomalies qualifiées</span>
+                        <span class="metric">{{ crystal_analysis.layer_pipeline.layer3.n_filtered }} filtrées</span>
+                    </div>
+                </div>
+                <!-- Layer 4 -->
+                <div class="pipeline-step">
+                    <div class="step-header">Layer 4 - ICC Score</div>
+                    <div class="step-metrics">
+                        <span class="metric score {% if crystal_analysis.layer_pipeline.layer4.global_score >= 80 %}score-good{% elif crystal_analysis.layer_pipeline.layer4.global_score >= 60 %}score-medium{% else %}score-bad{% endif %}">
+                            {{ "%.1f"|format(crystal_analysis.layer_pipeline.layer4.global_score) }}/100
+                        </span>
+                        <span class="metric level">{{ crystal_analysis.layer_pipeline.layer4.level }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top anomalies qualifiées -->
+            {% if crystal_analysis.layer_pipeline.top_qualified %}
+            <div class="top-qualified">
+                <h5>Top Anomalies Qualifiées</h5>
+                <table class="data-table mini-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Famille</th>
+                            <th>Pertinence</th>
+                            <th>Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in crystal_analysis.layer_pipeline.top_qualified %}
+                        <tr>
+                            <td>{{ a.rank }}</td>
+                            <td><strong>{{ a.famille }}</strong></td>
+                            <td>{{ "%.1f"|format(a.pertinence) }}</td>
+                            <td>{{ "%.2f"|format(a.impact) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
     </div>
     {% endif %}
 

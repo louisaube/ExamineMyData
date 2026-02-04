@@ -967,3 +967,113 @@ main:focus {
         height: 10px;
     }
 }
+
+/* Layer Pipeline Section (v2) */
+.layer-pipeline-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 8px;
+    border-left: 4px solid #6366f1;
+}
+
+.layer-pipeline-section h4 {
+    margin-bottom: 15px;
+    color: #4f46e5;
+}
+
+.pipeline-flow {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.pipeline-step {
+    flex: 1;
+    min-width: 200px;
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.step-header {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.step-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.step-metrics .metric {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.step-metrics .metric.highlight {
+    color: #059669;
+    font-weight: 600;
+}
+
+.step-metrics .metric.reduction {
+    color: #dc2626;
+    font-weight: 500;
+}
+
+.step-metrics .metric.score {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.step-metrics .metric.score-good { color: #059669; }
+.step-metrics .metric.score-medium { color: #d97706; }
+.step-metrics .metric.score-bad { color: #dc2626; }
+
+.step-metrics .metric.level {
+    background: #e0e7ff;
+    color: #4338ca;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.top-qualified {
+    margin-top: 15px;
+}
+
+.top-qualified h5 {
+    margin-bottom: 10px;
+    color: #374151;
+}
+
+.mini-table {
+    font-size: 0.85rem;
+}
+
+.mini-table th, .mini-table td {
+    padding: 6px 10px;
+}
+
+.mode-badge {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 10px;
+    font-weight: 500;
+    vertical-align: middle;
+}
+
+.mode-badge.temporal {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.mode-badge.aggregated {
+    background: #fef3c7;
+    color: #92400e;
+}
