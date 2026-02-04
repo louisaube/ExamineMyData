@@ -62,6 +62,60 @@
             </aside>
             {% endif %}
 
+            {% if current_anomaly.explanation_text or current_anomaly.top_feature_1 %}
+            <aside class="shap-explanation-box" role="complementary" aria-label="Explication IA">
+                <h4>
+                    Pourquoi cette anomalie ?
+                    {% if current_anomaly.confidence %}
+                    <span class="confidence-badge confidence-{{ current_anomaly.confidence|lower }}"
+                          aria-label="Confiance {{ current_anomaly.confidence }}">
+                        {{ current_anomaly.confidence }}
+                    </span>
+                    {% endif %}
+                </h4>
+                {% if current_anomaly.explanation_text %}
+                <p class="explanation-text">{{ current_anomaly.explanation_text }}</p>
+                {% endif %}
+
+                {% if current_anomaly.top_feature_1 %}
+                <div class="feature-contributions">
+                    <h5>Facteurs contributifs :</h5>
+                    <ul class="feature-list" aria-label="Facteurs principaux">
+                        <li class="feature-item">
+                            <span class="feature-name">{{ current_anomaly.top_feature_1 }}</span>
+                            <span class="feature-bar">
+                                <span class="feature-fill" style="width: {{ current_anomaly.top_feature_1_pct|default(0) }}%"></span>
+                            </span>
+                            <span class="feature-pct">{{ current_anomaly.top_feature_1_pct|default(0)|round(0)|int }}%</span>
+                        </li>
+                        {% if current_anomaly.top_feature_2 and current_anomaly.top_feature_2_pct > 5 %}
+                        <li class="feature-item">
+                            <span class="feature-name">{{ current_anomaly.top_feature_2 }}</span>
+                            <span class="feature-bar">
+                                <span class="feature-fill" style="width: {{ current_anomaly.top_feature_2_pct }}%"></span>
+                            </span>
+                            <span class="feature-pct">{{ current_anomaly.top_feature_2_pct|round(0)|int }}%</span>
+                        </li>
+                        {% endif %}
+                        {% if current_anomaly.top_feature_3 and current_anomaly.top_feature_3_pct > 5 %}
+                        <li class="feature-item">
+                            <span class="feature-name">{{ current_anomaly.top_feature_3 }}</span>
+                            <span class="feature-bar">
+                                <span class="feature-fill" style="width: {{ current_anomaly.top_feature_3_pct }}%"></span>
+                            </span>
+                            <span class="feature-pct">{{ current_anomaly.top_feature_3_pct|round(0)|int }}%</span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <p class="shap-note">
+                    <small>Analyse basée sur SHAP (SHapley Additive exPlanations)</small>
+                </p>
+            </aside>
+            {% endif %}
+
             <fieldset class="qualification-options" aria-describedby="qualification-help">
                 <legend id="qualification-help">Cette anomalie est-elle justifiée ?</legend>
 

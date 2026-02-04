@@ -920,6 +920,129 @@ main:focus {
     gap: 12px;
 }
 
+/* SHAP Explanation Box (Sprint 8) */
+.shap-explanation-box {
+    background: linear-gradient(135deg, #f6f9fc 0%, #eef3f9 100%);
+    border: 1px solid #d1dce8;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border-left: 4px solid #4299e1;
+}
+
+.shap-explanation-box h4 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 12px;
+}
+
+.shap-explanation-box .explanation-text {
+    font-size: 0.95rem;
+    color: #4a5568;
+    line-height: 1.5;
+    margin-bottom: 15px;
+}
+
+/* Confidence Badge */
+.confidence-badge {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.confidence-high {
+    background: #c6f6d5;
+    color: #22543d;
+}
+
+.confidence-medium {
+    background: #fefcbf;
+    color: #744210;
+}
+
+.confidence-low {
+    background: #fed7d7;
+    color: #822727;
+}
+
+/* Feature Contributions */
+.feature-contributions {
+    margin-top: 15px;
+}
+
+.feature-contributions h5 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 10px;
+}
+
+.feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.feature-item {
+    display: grid;
+    grid-template-columns: 180px 1fr 50px;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.feature-item:last-child {
+    border-bottom: none;
+}
+
+.feature-name {
+    font-size: 0.9rem;
+    color: #2d3748;
+    font-weight: 500;
+}
+
+.feature-bar {
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.feature-fill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #4299e1 0%, #3182ce 100%);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.feature-pct {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #3182ce;
+    text-align: right;
+}
+
+.shap-note {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px dashed #cbd5e0;
+}
+
+.shap-note small {
+    color: #a0aec0;
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
 /* No Anomalies State */
 .no-anomalies {
     text-align: center;

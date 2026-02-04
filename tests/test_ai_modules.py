@@ -172,6 +172,88 @@ def test_isolation_forest():
     return detector
 
 
+def test_isolation_forest_shap():
+    """Test de l'Isolation Forest avec SHAP explainability (Sprint 8)"""
+    print("\n" + "=" * 60)
+    print("TEST ISOLATION FOREST - SHAP EXPLAINABILITY")
+    print("=" * 60)
+
+    from gl_normalizer.ai.isolation_forest import (
+        IsolationForestDetector,
+        AnomalyExplanation,
+        SHAP_AVAILABLE,
+    )
+
+    print(f"  SHAP disponible: {SHAP_AVAILABLE}")
+
+    df = create_test_data(300)
+
+    detector = IsolationForestDetector(df, contamination=0.05)
+    detector.fit()
+
+    # Test explain_anomaly pour une anomalie spécifique
+    anomalies = detector.get_anomalies()
+    if len(anomalies) > 0:
+        first_anomaly_idx = anomalies.index[0]
+        print(f"\nTest explain_anomaly pour index {first_anomaly_idx}:")
+
+        explanation = detector.explain_anomaly(first_anomaly_idx, top_n=3)
+
+        assert explanation is not None, "L'explication ne devrait pas être None"
+        assert isinstance(explanation, AnomalyExplanation), "Type incorrect"
+        assert explanation.index == first_anomaly_idx, "Index incorrect"
+        assert len(explanation.top_features) <= 3, "Trop de features"
+        assert explanation.explanation_text, "Texte d'explication vide"
+        assert explanation.confidence in ["High", "Medium", "Low"], "Confiance invalide"
+
+        print(f"  Score: {explanation.anomaly_score:.3f}")
+        print(f"  Confiance: {explanation.confidence}")
+        print(f"  Explication: {explanation.explanation_text}")
+        print(f"\n  Top features:")
+        for feat, contrib, pct in explanation.top_features:
+            print(f"    - {feat}: {contrib:.3f} ({pct:.1f}%)")
+
+        # Test to_dict
+        exp_dict = explanation.to_dict()
+        assert "index" in exp_dict
+        assert "top_features" in exp_dict
+        print(f"\n  to_dict(): OK")
+
+    # Test explain_anomalies (batch)
+    print(f"\nTest explain_anomalies (batch):")
+    explanations = detector.explain_anomalies(top_n=3, max_anomalies=10)
+    print(f"  Anomalies expliquées: {len(explanations)}")
+    assert len(explanations) <= 10, "Trop d'anomalies retournées"
+
+    # Test get_anomalies_with_explanations
+    print(f"\nTest get_anomalies_with_explanations:")
+    anomalies_explained = detector.get_anomalies_with_explanations(
+        top_n_features=3,
+        max_anomalies=10
+    )
+    print(f"  Colonnes: {list(anomalies_explained.columns)}")
+    assert "explanation_text" in anomalies_explained.columns
+    assert "confidence" in anomalies_explained.columns
+    assert "top_feature_1" in anomalies_explained.columns
+    assert "top_feature_1_pct" in anomalies_explained.columns
+
+    if len(anomalies_explained) > 0:
+        print(f"\n  Exemple d'anomalie expliquée:")
+        row = anomalies_explained.iloc[0]
+        print(f"    Score: {row['anomaly_score']:.3f}")
+        print(f"    Confiance: {row['confidence']}")
+        print(f"    Feature 1: {row['top_feature_1']} ({row['top_feature_1_pct']:.1f}%)")
+        print(f"    Explication: {row['explanation_text'][:80]}...")
+
+    # Vérifier le summary inclut shap_available
+    summary = detector.summary()
+    assert "shap_available" in summary, "shap_available manquant dans summary"
+    print(f"\n  summary.shap_available: {summary['shap_available']}")
+
+    print(f"\n✓ Test Isolation Forest SHAP PASSÉ")
+    return detector
+
+
 def test_nlp_analyzer():
     """Test de l'analyseur NLP"""
     print("\n" + "=" * 60)
@@ -333,6 +415,7 @@ if __name__ == "__main__":
     # Tests individuels
     test_benford()
     test_isolation_forest()
+    test_isolation_forest_shap()  # Sprint 8: SHAP explainability
     test_nlp_analyzer()
     test_xgboost_scorer()
     test_risk_scorer()

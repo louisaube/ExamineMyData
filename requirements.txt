@@ -10,6 +10,9 @@ polars>=1.0.0
 # Machine Learning - Core
 scikit-learn>=1.1.0
 
+# Machine Learning - Explainability (Sprint 8)
+shap>=0.42.0
+
 # Machine Learning - Advanced (optional)
 xgboost>=1.7.0
 

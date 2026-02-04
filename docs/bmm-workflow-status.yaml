@@ -62,9 +62,9 @@ phase_4_implementation:
     total_sprints: 8
   stories:
     total: 37
-    completed: 33
+    completed: 34
     in_progress: 0
-    pending: 4
+    pending: 3
     completed_stories:
       # Sprint 1 - Fondations
       - "STORY-000: Setup projet (CI GitHub Actions) [NEW]"
@@ -182,18 +182,26 @@ research:
         - "Benford needs adaptive thresholds to reduce FP"
         - "Human-in-the-loop mandatory for final qualification"
 
-# Sprint 8 - AI Improvements (NEW)
+# Sprint 8 - AI Improvements (IN PROGRESS)
 sprint_8_backlog:
-  status: "not_started"
+  status: "in_progress"
   goal: "Améliorer l'efficacité IA et réduire les faux positifs"
   research_ref: "docs/research-anomaly-detection-ia-audit-2026-02-04.md"
   stories:
     - id: "STORY-034"
       title: "SHAP Explainability pour Isolation Forest"
-      status: "not_started"
+      status: "completed"
       priority: "must"
       points: 5
       research_insight: "SHAP explainability increases actionable rate to 85%"
+      completed_at: "2026-02-04"
+      notes: |
+        - Added SHAP TreeExplainer to isolation_forest.py
+        - New methods: explain_anomaly(), explain_anomalies(), get_anomalies_with_explanations()
+        - AnomalyExplanation dataclass with feature contributions
+        - UI integration in qualification.html with visual feature bars
+        - CSS styles for SHAP explanation box
+        - Tests added to test_ai_modules.py
     - id: "STORY-035"
       title: "Amélioration Benford (2ème chiffre + seuils adaptatifs)"
       status: "not_started"
@@ -215,10 +223,10 @@ sprint_8_backlog:
 
 # Current workflow position
 current_phase: 4
-current_step: "sprint_8_planning"
-last_workflow: "sprint-planning"
+current_step: "sprint_8_implementation"
+last_workflow: "dev-story"
 last_workflow_date: "2026-02-04"
-next_recommended_action: "Start Sprint 8: /dev-story STORY-034"
+next_recommended_action: "Continue Sprint 8: /dev-story STORY-035 (Benford improvements)"
 
 # Notes
 notes: |
