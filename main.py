@@ -473,8 +473,17 @@ async def results(request: Request, job_id: str):
             "recommendations": result.recommendations[:5] if hasattr(result, 'recommendations') else [],
             # STORY-030: Analyse autonome IA
             "autonomous_analysis": data.get("autonomous_analysis"),
-            # GL Crystal - Analyse topologique
-            "crystal_analysis": data.get("crystal_analysis"),
+            # Advanced Statistics (STORY-024, 025, 026)
+            "mad_results": result.mad_results if hasattr(result, 'mad_results') else None,
+            "iqr_results": result.iqr_results if hasattr(result, 'iqr_results') else None,
+            "seasonality": result.seasonality if hasattr(result, 'seasonality') else None,
+            "clustering": result.clustering if hasattr(result, 'clustering') else None,
+            # AI Pipeline
+            "ai_available": result.ai_available if hasattr(result, 'ai_available') else False,
+            "benford_analysis": result.benford_analysis if hasattr(result, 'benford_analysis') else None,
+            "isolation_forest": result.isolation_forest if hasattr(result, 'isolation_forest') else None,
+            "nlp_analysis": result.nlp_analysis if hasattr(result, 'nlp_analysis') else None,
+            "combined_risk_scores": result.combined_risk_scores if hasattr(result, 'combined_risk_scores') else None,
         }
 
     return templates.TemplateResponse("results.html", context)

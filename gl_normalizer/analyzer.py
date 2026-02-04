@@ -21,6 +21,28 @@ from .detector import AnomalyDetector, DetectionResult
 from .regularization import RegularizationDetector, RegularizationAnalysis
 from .pnl_normalizer import PnLNormalizer, NormalizedPLResult, ProvisionAnalysis
 
+# Import advanced stats
+from .advanced_stats import (
+    MADDetector, MADResult,
+    IQRDetector, IQRResult,
+    SeasonalDecomposer, SeasonalityResult, SeasonalPattern,
+    AccountClusterer, ClusteringSummary, AccountBehaviorCluster,
+    detect_anomalies_robust,
+    analyze_seasonality,
+    cluster_accounts,
+)
+
+# Import AI modules conditionally
+AI_AVAILABLE = False
+try:
+    from .ai.benford import BenfordAnalyzer, BenfordAnalysis, analyze_benford
+    from .ai.isolation_forest import IsolationForestDetector, IsolationForestAnalysis, detect_anomalies_iforest
+    from .ai.nlp_analyzer import NLPAnalyzer, NLPAnalysis, analyze_labels
+    from .ai.risk_scorer import RiskScorer, RiskAnalysis, calculate_risk_scores, RiskLevel
+    AI_AVAILABLE = True
+except ImportError:
+    pass
+
 
 class AnomalyCategory(Enum):
     """Catégories d'anomalies avec contexte PCG"""
@@ -119,6 +141,19 @@ class FullAnalysisResult:
     overall_risk_score: float = 0.0
     data_confidence_score: float = 0.0
 
+    # Advanced Statistics (STORY-024, 025, 026)
+    mad_results: Optional[List[Any]] = None       # MAD detector results
+    iqr_results: Optional[List[Any]] = None       # IQR detector results
+    seasonality: Optional[Dict[str, Any]] = None  # Seasonal decomposition
+    clustering: Optional[Dict[str, Any]] = None   # Account behavioral clusters
+
+    # AI Analysis (Benford, Isolation Forest, NLP, Risk Scoring)
+    ai_available: bool = False
+    benford_analysis: Optional[Dict[str, Any]] = None
+    isolation_forest: Optional[Dict[str, Any]] = None
+    nlp_analysis: Optional[Dict[str, Any]] = None
+    combined_risk_scores: Optional[Dict[str, Any]] = None
+
     # Résumé
     summary: Dict[str, Any] = field(default_factory=dict)
     warnings: List[str] = field(default_factory=list)
@@ -195,11 +230,24 @@ class GLAnalyzer:
         # 5. Calcul du run rate
         result.run_rate = self._compute_run_rate()
 
-        # 6. Scores globaux
+        # 6. Advanced Statistics (MAD, IQR, Seasonality, Clustering)
+        result.mad_results, result.iqr_results = self._run_advanced_stats()
+        result.seasonality = self._run_seasonality_analysis()
+        result.clustering = self._run_clustering()
+
+        # 7. AI Pipeline (Benford, Isolation Forest, NLP, Risk Scoring)
+        result.ai_available = AI_AVAILABLE
+        if AI_AVAILABLE:
+            result.benford_analysis = self._run_benford()
+            result.isolation_forest = self._run_isolation_forest()
+            result.nlp_analysis = self._run_nlp_analysis()
+            result.combined_risk_scores = self._run_risk_scoring(result)
+
+        # 8. Scores globaux
         result.overall_risk_score = self._compute_overall_risk(result)
         result.data_confidence_score = self._compute_confidence(result)
 
-        # 7. Résumé et recommandations
+        # 9. Résumé et recommandations
         result.summary = self._build_summary(result)
         result.warnings = self._collect_warnings(result)
         result.recommendations = self._build_recommendations(result)
@@ -551,6 +599,296 @@ class GLAnalyzer:
             score -= 0.3
 
         return max(score, 0.1)
+
+    # =========================================================================
+    # Advanced Statistics Methods (STORY-024, 025, 026)
+    # =========================================================================
+
+    def _run_advanced_stats(self) -> Tuple[Optional[List], Optional[List]]:
+        """Exécute MAD et IQR detection"""
+        mad_results = None
+        iqr_results = None
+
+        try:
+            if "montant" not in self.df.columns:
+                # Créer colonne montant si absente
+                if "debit" in self.df.columns and "credit" in self.df.columns:
+                    self.df["montant"] = self.df["debit"].fillna(0) - self.df["credit"].fillna(0)
+                else:
+                    return None, None
+
+            # MAD Detection
+            mad = MADDetector(threshold=3.5)
+            mad_result = mad.detect(self.df["montant"].abs().values)
+            if mad_result:
+                mad_results = [{
+                    "n_outliers": mad_result.n_outliers,
+                    "pct_outliers": mad_result.outlier_percentage,
+                    "median": mad_result.median,
+                    "mad": mad_result.mad,
+                    "threshold": mad_result.threshold,
+                    "outlier_indices": mad_result.outlier_indices[:50].tolist() if mad_result.outlier_indices is not None else []
+                }]
+
+            # IQR Detection
+            iqr = IQRDetector(k=1.5)
+            iqr_result = iqr.detect(self.df["montant"].abs().values)
+            if iqr_result:
+                iqr_results = [{
+                    "n_outliers": iqr_result.n_outliers,
+                    "pct_outliers": iqr_result.outlier_percentage,
+                    "q1": iqr_result.q1,
+                    "q3": iqr_result.q3,
+                    "iqr": iqr_result.iqr,
+                    "lower_bound": iqr_result.lower_bound,
+                    "upper_bound": iqr_result.upper_bound
+                }]
+
+        except Exception as e:
+            pass
+
+        return mad_results, iqr_results
+
+    def _run_seasonality_analysis(self) -> Optional[Dict[str, Any]]:
+        """Analyse saisonnière des comptes"""
+        try:
+            if "date" not in self.df.columns or "compte" not in self.df.columns:
+                return None
+
+            if "montant" not in self.df.columns:
+                if "debit" in self.df.columns and "credit" in self.df.columns:
+                    self.df["montant"] = self.df["debit"].fillna(0) - self.df["credit"].fillna(0)
+                else:
+                    return None
+
+            decomposer = SeasonalDecomposer()
+            results_by_account = {}
+
+            # Analyser les comptes avec le plus de mouvements
+            top_accounts = (
+                self.df.groupby("compte")["montant"]
+                .agg(["sum", "count"])
+                .nlargest(20, "count")
+                .index.tolist()
+            )
+
+            december_concentrated = []
+
+            for compte in top_accounts:
+                compte_df = self.df[self.df["compte"] == compte].copy()
+                if len(compte_df) < 12:
+                    continue
+
+                try:
+                    compte_df["date"] = pd.to_datetime(compte_df["date"], errors="coerce")
+                    compte_df = compte_df.dropna(subset=["date"])
+
+                    if len(compte_df) < 3:
+                        continue
+
+                    result = decomposer.analyze(compte_df["montant"].values, compte_df["date"].values)
+
+                    if result:
+                        results_by_account[compte] = {
+                            "pattern": result.pattern.value,
+                            "seasonal_strength": result.seasonal_strength,
+                            "peak_months": result.peak_months,
+                            "interpretation": result.interpretation
+                        }
+
+                        # Identifier les comptes concentrés en décembre
+                        if 12 in result.peak_months and result.seasonal_strength > 0.5:
+                            december_concentrated.append({
+                                "compte": compte,
+                                "strength": result.seasonal_strength,
+                                "pattern": result.pattern.value,
+                                "interpretation": result.interpretation
+                            })
+                except Exception:
+                    continue
+
+            return {
+                "accounts_analyzed": len(results_by_account),
+                "december_concentrated": december_concentrated,
+                "by_account": results_by_account
+            }
+
+        except Exception as e:
+            return None
+
+    def _run_clustering(self) -> Optional[Dict[str, Any]]:
+        """Clustering comportemental des comptes"""
+        try:
+            if "compte" not in self.df.columns:
+                return None
+
+            if "montant" not in self.df.columns:
+                if "debit" in self.df.columns and "credit" in self.df.columns:
+                    self.df["montant"] = self.df["debit"].fillna(0) - self.df["credit"].fillna(0)
+                else:
+                    return None
+
+            clusterer = AccountClusterer()
+            summary = clusterer.cluster(self.df)
+
+            if summary:
+                return {
+                    "n_accounts": summary.n_accounts,
+                    "cluster_distribution": {c.value: n for c, n in summary.cluster_distribution.items()},
+                    "accounts_by_cluster": {
+                        c.value: accounts[:10]  # Top 10 par cluster
+                        for c, accounts in summary.accounts_by_cluster.items()
+                    }
+                }
+
+        except Exception as e:
+            return None
+
+        return None
+
+    # =========================================================================
+    # AI Pipeline Methods (Benford, Isolation Forest, NLP, Risk Scoring)
+    # =========================================================================
+
+    def _run_benford(self) -> Optional[Dict[str, Any]]:
+        """Analyse de Benford sur les montants"""
+        if not AI_AVAILABLE:
+            return None
+
+        try:
+            if "montant" not in self.df.columns:
+                if "debit" in self.df.columns:
+                    amounts = self.df["debit"].dropna()
+                else:
+                    return None
+            else:
+                amounts = self.df["montant"].abs()
+
+            amounts = amounts[amounts > 0]
+
+            if len(amounts) < 100:
+                return None
+
+            analysis = analyze_benford(amounts.values)
+
+            if analysis:
+                return {
+                    "conformity_score": analysis.conformity_score,
+                    "chi_square": analysis.chi_square_statistic,
+                    "p_value": analysis.p_value,
+                    "is_conformant": analysis.is_conformant,
+                    "digit_distribution": analysis.observed_distribution.tolist() if analysis.observed_distribution is not None else [],
+                    "expected_distribution": analysis.expected_distribution.tolist() if analysis.expected_distribution is not None else [],
+                    "suspicious_digits": analysis.suspicious_digits,
+                    "interpretation": analysis.interpretation
+                }
+
+        except Exception as e:
+            return None
+
+        return None
+
+    def _run_isolation_forest(self) -> Optional[Dict[str, Any]]:
+        """Détection d'anomalies par Isolation Forest"""
+        if not AI_AVAILABLE:
+            return None
+
+        try:
+            analysis = detect_anomalies_iforest(self.df, contamination=0.05)
+
+            if analysis:
+                # Récupérer les top anomalies
+                top_anomalies = []
+                for anom in analysis.anomalies[:20]:
+                    top_anomalies.append({
+                        "index": int(anom.index),
+                        "score": float(anom.anomaly_score),
+                        "compte": str(anom.compte) if hasattr(anom, 'compte') else None,
+                        "montant": float(anom.montant) if hasattr(anom, 'montant') else None,
+                        "features": anom.feature_contributions if hasattr(anom, 'feature_contributions') else {}
+                    })
+
+                return {
+                    "n_anomalies": analysis.n_anomalies,
+                    "contamination_rate": analysis.contamination_rate,
+                    "top_anomalies": top_anomalies,
+                    "feature_importance": analysis.feature_importance if hasattr(analysis, 'feature_importance') else {}
+                }
+
+        except Exception as e:
+            return None
+
+        return None
+
+    def _run_nlp_analysis(self) -> Optional[Dict[str, Any]]:
+        """Analyse NLP des libellés"""
+        if not AI_AVAILABLE:
+            return None
+
+        try:
+            # Trouver la colonne libellé
+            libelle_col = None
+            for col in ["libelle", "libellé", "label", "description"]:
+                if col in self.df.columns:
+                    libelle_col = col
+                    break
+
+            if libelle_col is None:
+                return None
+
+            analysis = analyze_labels(self.df[libelle_col].dropna().values)
+
+            if analysis:
+                return {
+                    "total_labels": analysis.total_labels,
+                    "unique_labels": analysis.unique_labels,
+                    "empty_ratio": analysis.empty_ratio,
+                    "suspicious_patterns": analysis.suspicious_patterns[:10] if hasattr(analysis, 'suspicious_patterns') else [],
+                    "duplicate_groups": analysis.duplicate_groups[:5] if hasattr(analysis, 'duplicate_groups') else [],
+                    "generic_labels_count": analysis.generic_labels_count if hasattr(analysis, 'generic_labels_count') else 0,
+                    "interpretation": analysis.interpretation if hasattr(analysis, 'interpretation') else ""
+                }
+
+        except Exception as e:
+            return None
+
+        return None
+
+    def _run_risk_scoring(self, result: FullAnalysisResult) -> Optional[Dict[str, Any]]:
+        """Calcul du score de risque combiné"""
+        if not AI_AVAILABLE:
+            return None
+
+        try:
+            # Préparer les inputs pour le risk scorer
+            inputs = {
+                "benford": result.benford_analysis,
+                "isolation_forest": result.isolation_forest,
+                "nlp": result.nlp_analysis,
+                "mad": result.mad_results[0] if result.mad_results else None,
+                "seasonality": result.seasonality,
+            }
+
+            analysis = calculate_risk_scores(self.df, inputs)
+
+            if analysis:
+                return {
+                    "overall_risk": analysis.overall_risk.value if hasattr(analysis.overall_risk, 'value') else str(analysis.overall_risk),
+                    "risk_score": analysis.risk_score,
+                    "component_scores": analysis.component_scores if hasattr(analysis, 'component_scores') else {},
+                    "high_risk_accounts": analysis.high_risk_accounts[:20] if hasattr(analysis, 'high_risk_accounts') else [],
+                    "risk_factors": analysis.risk_factors if hasattr(analysis, 'risk_factors') else [],
+                    "interpretation": analysis.interpretation if hasattr(analysis, 'interpretation') else ""
+                }
+
+        except Exception as e:
+            return None
+
+        return None
+
+    # =========================================================================
+    # Summary and Recommendations
+    # =========================================================================
 
     def _build_summary(self, result: FullAnalysisResult) -> Dict[str, Any]:
         """Construit le résumé"""

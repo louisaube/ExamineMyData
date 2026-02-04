@@ -193,6 +193,199 @@
     </div>
     {% endif %}
 
+    <!-- ================================================================== -->
+    <!-- Analyse Statistique Avancée (MAD, IQR, Saisonnalité, Clustering)  -->
+    <!-- ================================================================== -->
+
+    {% if mad_results or iqr_results or seasonality or clustering %}
+    <div class="advanced-stats-section">
+        <h3>Analyse Statistique Avancée</h3>
+
+        <div class="stats-grid">
+            <!-- MAD & IQR Outliers -->
+            {% if mad_results or iqr_results %}
+            <div class="stat-card">
+                <h4>Détection d'Outliers</h4>
+                {% if mad_results %}
+                <div class="stat-item">
+                    <span class="stat-label">MAD (Median Absolute Deviation)</span>
+                    <span class="stat-value">{{ mad_results[0].n_outliers }} outliers ({{ "%.1f"|format(mad_results[0].pct_outliers) }}%)</span>
+                    <small>Médiane: {{ "{:,.0f}".format(mad_results[0].median) }}€ | Seuil: {{ "%.1f"|format(mad_results[0].threshold) }}x</small>
+                </div>
+                {% endif %}
+                {% if iqr_results %}
+                <div class="stat-item">
+                    <span class="stat-label">IQR (Interquartile Range)</span>
+                    <span class="stat-value">{{ iqr_results[0].n_outliers }} outliers ({{ "%.1f"|format(iqr_results[0].pct_outliers) }}%)</span>
+                    <small>Q1: {{ "{:,.0f}".format(iqr_results[0].q1) }}€ | Q3: {{ "{:,.0f}".format(iqr_results[0].q3) }}€</small>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Saisonnalité -->
+            {% if seasonality %}
+            <div class="stat-card">
+                <h4>Analyse Saisonnière</h4>
+                <div class="stat-item">
+                    <span class="stat-label">Comptes analysés</span>
+                    <span class="stat-value">{{ seasonality.accounts_analyzed }}</span>
+                </div>
+                {% if seasonality.december_concentrated %}
+                <div class="december-alert">
+                    <strong>{{ seasonality.december_concentrated|length }} comptes concentrés en décembre:</strong>
+                    <ul>
+                        {% for item in seasonality.december_concentrated[:5] %}
+                        <li>
+                            <span class="compte-badge">{{ item.compte }}</span>
+                            {{ item.pattern }} (force: {{ "%.0f"|format(item.strength * 100) }}%)
+                            <br><small>{{ item.interpretation }}</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Clustering -->
+            {% if clustering %}
+            <div class="stat-card">
+                <h4>Clustering Comportemental</h4>
+                <div class="stat-item">
+                    <span class="stat-label">Comptes clusterisés</span>
+                    <span class="stat-value">{{ clustering.n_accounts }}</span>
+                </div>
+                <div class="cluster-distribution">
+                    {% for cluster, count in clustering.cluster_distribution.items() %}
+                    <div class="cluster-item">
+                        <span class="cluster-name">{{ cluster|replace('_', ' ')|title }}</span>
+                        <span class="cluster-count">{{ count }} comptes</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ================================================================== -->
+    <!-- Analyse IA (Benford, Isolation Forest, NLP)                       -->
+    <!-- ================================================================== -->
+
+    {% if ai_available and (benford_analysis or isolation_forest or nlp_analysis) %}
+    <div class="ai-analysis-section">
+        <h3>Pipeline d'Analyse IA</h3>
+
+        <div class="ai-grid">
+            <!-- Benford -->
+            {% if benford_analysis %}
+            <div class="ai-card {% if benford_analysis.is_conformant %}ai-pass{% else %}ai-warning{% endif %}">
+                <h4>Loi de Benford</h4>
+                <div class="ai-score">
+                    <span class="score-value">{{ "%.0f"|format(benford_analysis.conformity_score * 100) }}%</span>
+                    <span class="score-label">Conformité</span>
+                </div>
+                <div class="ai-details">
+                    <p>Chi²: {{ "%.2f"|format(benford_analysis.chi_square) }} | p-value: {{ "%.4f"|format(benford_analysis.p_value) }}</p>
+                    {% if benford_analysis.suspicious_digits %}
+                    <p class="suspicious">Chiffres suspects: {{ benford_analysis.suspicious_digits|join(', ') }}</p>
+                    {% endif %}
+                    <p class="interpretation">{{ benford_analysis.interpretation }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Isolation Forest -->
+            {% if isolation_forest %}
+            <div class="ai-card">
+                <h4>Isolation Forest</h4>
+                <div class="ai-score">
+                    <span class="score-value">{{ isolation_forest.n_anomalies }}</span>
+                    <span class="score-label">Anomalies ML</span>
+                </div>
+                <div class="ai-details">
+                    <p>Taux de contamination: {{ "%.1f"|format(isolation_forest.contamination_rate * 100) }}%</p>
+                    {% if isolation_forest.top_anomalies %}
+                    <div class="top-anomalies">
+                        <strong>Top anomalies:</strong>
+                        <ul>
+                            {% for anom in isolation_forest.top_anomalies[:5] %}
+                            <li>
+                                {% if anom.compte %}Compte {{ anom.compte }} - {% endif %}
+                                {{ "{:,.0f}".format(anom.montant) if anom.montant else '' }}€
+                                (score: {{ "%.2f"|format(anom.score) }})
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- NLP -->
+            {% if nlp_analysis %}
+            <div class="ai-card">
+                <h4>Analyse NLP Libellés</h4>
+                <div class="ai-score">
+                    <span class="score-value">{{ nlp_analysis.unique_labels }}</span>
+                    <span class="score-label">Libellés uniques</span>
+                </div>
+                <div class="ai-details">
+                    <p>Total: {{ nlp_analysis.total_labels }} | Vides: {{ "%.1f"|format(nlp_analysis.empty_ratio * 100) }}%</p>
+                    {% if nlp_analysis.generic_labels_count > 0 %}
+                    <p class="suspicious">{{ nlp_analysis.generic_labels_count }} libellés génériques détectés</p>
+                    {% endif %}
+                    {% if nlp_analysis.suspicious_patterns %}
+                    <div class="suspicious-patterns">
+                        <strong>Patterns suspects:</strong>
+                        <ul>
+                            {% for pattern in nlp_analysis.suspicious_patterns[:3] %}
+                            <li>{{ pattern }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    {% if nlp_analysis.interpretation %}
+                    <p class="interpretation">{{ nlp_analysis.interpretation }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Score de risque combiné -->
+        {% if combined_risk_scores %}
+        <div class="combined-risk">
+            <h4>Score de Risque Combiné</h4>
+            <div class="risk-meter risk-{{ combined_risk_scores.overall_risk|lower }}">
+                <span class="risk-level">{{ combined_risk_scores.overall_risk }}</span>
+                <span class="risk-score">{{ "%.0f"|format(combined_risk_scores.risk_score * 100) }}%</span>
+            </div>
+            {% if combined_risk_scores.risk_factors %}
+            <div class="risk-factors">
+                <strong>Facteurs de risque:</strong>
+                <ul>
+                    {% for factor in combined_risk_scores.risk_factors[:5] %}
+                    <li>{{ factor }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            {% if combined_risk_scores.interpretation %}
+            <p class="interpretation">{{ combined_risk_scores.interpretation }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% elif not ai_available %}
+    <div class="ai-unavailable">
+        <p>Pipeline IA non disponible. Installez les dépendances: <code>pip install scikit-learn xgboost</code></p>
+    </div>
+    {% endif %}
+
     <!-- Anomalies détaillées -->
     {% if anomalies %}
     <div class="anomalies-section">
@@ -929,192 +1122,339 @@ tr.severity-high { background: #ffe5d0; }
     color: #495057;
 }
 
-/* GL Crystal - Analyse topologique */
-.crystal-section {
+/* ================================================================== */
+/* Analyse Statistique Avancée (MAD, IQR, Saisonnalité, Clustering)   */
+/* ================================================================== */
+
+.advanced-stats-section {
     margin: 2rem 0;
     padding: 1.5rem;
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
     border-radius: 12px;
-    border: 2px solid #dee2e6;
+    border: 2px solid #0ea5e9;
 }
 
-.crystal-section h3 {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
+.advanced-stats-section h3 {
+    color: #0369a1;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #0ea5e9;
 }
 
-.crystal-icon {
-    font-size: 1.3em;
-}
-
-.crystal-section .section-intro {
-    color: #6c757d;
-    margin-bottom: 1.5rem;
-}
-
-/* Métriques Crystal */
-.crystal-metrics {
-    display: flex;
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
 }
 
-.crystal-metric {
-    flex: 1;
-    min-width: 130px;
-    padding: 1rem;
+.stat-card {
     background: white;
     border-radius: 8px;
-    text-align: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    border-left: 4px solid #6c757d;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-.crystal-metric.metric-success { border-left-color: #28a745; }
-.crystal-metric.metric-warning { border-left-color: #ffc107; }
-.crystal-metric.metric-danger { border-left-color: #dc3545; }
+.stat-card h4 {
+    color: #0369a1;
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    border-bottom: 1px solid #e0f2fe;
+    padding-bottom: 0.5rem;
+}
 
-.crystal-metric .metric-value {
+.stat-item {
+    margin-bottom: 1rem;
+}
+
+.stat-item .stat-label {
     display: block;
-    font-size: 2rem;
-    font-weight: bold;
-    color: #212529;
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
 }
 
-.crystal-metric .metric-label {
+.stat-item .stat-value {
     display: block;
-    font-size: 0.9rem;
-    color: #495057;
-    margin-top: 0.25rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
 }
 
-.crystal-metric small {
+.stat-item small {
     display: block;
     font-size: 0.75rem;
-    color: #868e96;
+    color: #94a3b8;
     margin-top: 0.25rem;
 }
 
-/* Répartition par univers */
-.univers-distribution {
-    margin: 1.5rem 0;
-    background: white;
-    padding: 1rem;
-    border-radius: 8px;
+.december-alert {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
 }
 
-.univers-distribution h4 {
-    margin-bottom: 1rem;
-    color: #495057;
+.december-alert strong {
+    color: #b45309;
+    font-size: 0.9rem;
 }
 
-.univers-bars {
+.december-alert ul {
+    margin: 0.5rem 0 0 1rem;
+    padding: 0;
+}
+
+.december-alert li {
+    margin: 0.5rem 0;
+    font-size: 0.85rem;
+}
+
+.compte-badge {
+    display: inline-block;
+    background: #0ea5e9;
+    color: white;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: monospace;
+}
+
+.cluster-distribution {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.cluster-item {
+    background: #f1f5f9;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    min-width: 100px;
 }
 
-.univers-bar {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+.cluster-name {
+    font-size: 0.75rem;
+    color: #64748b;
+    text-transform: capitalize;
 }
 
-.univers-name {
-    width: 100px;
-    font-size: 0.85rem;
+.cluster-count {
+    font-size: 1rem;
     font-weight: 600;
-    text-align: right;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    color: white;
+    color: #334155;
 }
 
-.univers-cristallin { background: #28a745; }
-.univers-nominatif { background: #007bff; }
-.univers-inventaire { background: #6f42c1; }
-.univers-ventilation { background: #fd7e14; }
-.univers-composite { background: #dc3545; }
-.univers-non_classe { background: #6c757d; }
+/* ================================================================== */
+/* Pipeline d'Analyse IA (Benford, Isolation Forest, NLP)             */
+/* ================================================================== */
 
-.bar-container {
-    flex: 1;
-    height: 20px;
-    background: #e9ecef;
-    border-radius: 10px;
-    overflow: hidden;
+.ai-analysis-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #fdf4ff, #fae8ff);
+    border-radius: 12px;
+    border: 2px solid #a855f7;
 }
 
-.bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #007bff, #28a745);
-    border-radius: 10px;
-    transition: width 0.3s ease;
+.ai-analysis-section h3 {
+    color: #7e22ce;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #a855f7;
 }
 
-.univers-count {
-    width: 100px;
-    font-size: 0.85rem;
-    color: #495057;
+.ai-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
 }
 
-/* Alertes Crystal */
-.crystal-alerts {
-    margin-top: 1.5rem;
+.ai-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border-left: 4px solid #a855f7;
 }
 
-.crystal-alerts h4 {
-    margin-bottom: 0.5rem;
-    color: #495057;
+.ai-card.ai-pass {
+    border-left-color: #22c55e;
 }
 
-.alert-explanation {
-    color: #6c757d;
-    font-size: 0.9rem;
+.ai-card.ai-warning {
+    border-left-color: #f59e0b;
+}
+
+.ai-card h4 {
+    color: #7e22ce;
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+}
+
+.ai-score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    background: #faf5ff;
+    border-radius: 8px;
     margin-bottom: 1rem;
 }
 
-.crystal-table {
-    background: white;
-}
-
-.crystal-table th {
-    background: #495057;
-    color: white;
-}
-
-.icc-value, .surprise-value {
-    font-family: monospace;
+.ai-score .score-value {
+    font-size: 2rem;
     font-weight: bold;
+    color: #7e22ce;
 }
 
-.crystal-badge {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+.ai-score .score-label {
     font-size: 0.8rem;
+    color: #9333ea;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ai-details {
+    font-size: 0.9rem;
+}
+
+.ai-details p {
+    margin: 0.5rem 0;
+    color: #64748b;
+}
+
+.ai-details .suspicious {
+    color: #dc2626;
+    font-weight: 500;
+}
+
+.ai-details .interpretation {
+    background: #f8fafc;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-style: italic;
+    color: #475569;
+}
+
+.top-anomalies, .suspicious-patterns {
+    margin-top: 0.75rem;
+}
+
+.top-anomalies strong, .suspicious-patterns strong {
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+.top-anomalies ul, .suspicious-patterns ul {
+    margin: 0.25rem 0 0 1rem;
+    padding: 0;
+}
+
+.top-anomalies li, .suspicious-patterns li {
+    font-size: 0.85rem;
+    margin: 0.25rem 0;
+    color: #64748b;
+}
+
+/* Score de risque combiné */
+.combined-risk {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.combined-risk h4 {
+    color: #7e22ce;
+    margin: 0 0 1rem 0;
+}
+
+.risk-meter {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.risk-meter.risk-low {
+    background: linear-gradient(90deg, #dcfce7, #bbf7d0);
+    border: 2px solid #22c55e;
+}
+
+.risk-meter.risk-medium {
+    background: linear-gradient(90deg, #fef9c3, #fef08a);
+    border: 2px solid #eab308;
+}
+
+.risk-meter.risk-high {
+    background: linear-gradient(90deg, #fed7aa, #fdba74);
+    border: 2px solid #f97316;
+}
+
+.risk-meter.risk-critical {
+    background: linear-gradient(90deg, #fecaca, #fca5a5);
+    border: 2px solid #ef4444;
+}
+
+.risk-level {
+    font-size: 1.2rem;
     font-weight: bold;
+    text-transform: uppercase;
 }
 
-.crystal-badge.crystal-cristallin { background: #d4edda; color: #155724; }
-.crystal-badge.crystal-vitreux { background: #fff3cd; color: #856404; }
-.crystal-badge.crystal-amorphe { background: #f8d7da; color: #721c24; }
+.risk-meter.risk-low .risk-level { color: #15803d; }
+.risk-meter.risk-medium .risk-level { color: #a16207; }
+.risk-meter.risk-high .risk-level { color: #c2410c; }
+.risk-meter.risk-critical .risk-level { color: #dc2626; }
 
-.univers-badge {
-    display: inline-block;
-    padding: 0.2rem 0.4rem;
-    border-radius: 3px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: white;
+.risk-score {
+    font-size: 2rem;
+    font-weight: bold;
+    font-family: monospace;
 }
 
-tr.crystal-cristallin { background: #d4edda; }
-tr.crystal-vitreux { background: #fff3cd; }
-tr.crystal-amorphe { background: #f8d7da; }
+.risk-factors {
+    margin-top: 1rem;
+}
+
+.risk-factors strong {
+    font-size: 0.9rem;
+    color: #475569;
+}
+
+.risk-factors ul {
+    margin: 0.5rem 0 0 1.5rem;
+    padding: 0;
+}
+
+.risk-factors li {
+    margin: 0.3rem 0;
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.ai-unavailable {
+    margin: 2rem 0;
+    padding: 1rem;
+    background: #f1f5f9;
+    border-radius: 8px;
+    text-align: center;
+    color: #64748b;
+}
+
+.ai-unavailable code {
+    background: #e2e8f0;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
 </style>
 
 <script>
