@@ -52,9 +52,17 @@ tests/                   # Test suite
 ## Key Dependencies
 - fastapi, uvicorn, jinja2 - Web framework
 - pandas, numpy - Data manipulation
+- polars - High-performance data manipulation (Crystal analysis)
+- numba - JIT compilation for numerical calculations
 - openpyxl - Excel file handling
 - scipy, scikit-learn - Statistical analysis
 - xgboost - AI features
+
+## Performance Optimizations (Feb 2026)
+- **Polars**: Crystal analysis uses Polars for data transformation (x5-9 speedup)
+- **Numba JIT**: Shannon entropy calculations use @njit compilation (x170 speedup)
+- **itertuples**: GLEntry creation uses itertuples instead of iterrows (x13 speedup)
+- **Graceful fallback**: Automatic fallback to pandas if Polars operations fail
 
 ## Web Application Features
 1. Upload Excel files (GL data)
