@@ -172,22 +172,36 @@ def run_crystal_analysis(df: pd.DataFrame, year: int) -> Optional[Dict[str, Any]
             work_df = pl_work.to_pandas()
             default_date = date(year, 1, 1)
 
-            # Gestion des colonnes manquantes
+            # Gestion des colonnes manquantes et conversion en types corrects
             if 'date_parsed' in work_df.columns:
                 work_df['date'] = work_df['date_parsed'].apply(lambda x: x if pd.notna(x) else default_date)
             else:
                 work_df['date'] = default_date
-            if 'journal' not in work_df.columns:
+
+            # Colonnes texte : conversion explicite en string (évite les float NaN)
+            if 'journal' in work_df.columns:
+                work_df['journal'] = work_df['journal'].fillna('OD').astype(str).replace('nan', 'OD').replace('None', 'OD')
+            else:
                 work_df['journal'] = 'OD'
-            if 'libelle' not in work_df.columns:
+
+            if 'libelle' in work_df.columns:
+                work_df['libelle'] = work_df['libelle'].fillna('').astype(str).replace('nan', '').replace('None', '')
+            else:
                 work_df['libelle'] = ''
-            if 'piece' not in work_df.columns:
+
+            if 'piece' in work_df.columns:
+                work_df['piece'] = work_df['piece'].fillna('').astype(str).replace('nan', '').replace('None', '')
+            else:
                 work_df['piece'] = ''
+
             if 'debit' not in work_df.columns:
                 work_df['debit'] = 0.0
             if 'credit' not in work_df.columns:
                 work_df['credit'] = 0.0
-            if 'analytique' not in work_df.columns:
+
+            if 'analytique' in work_df.columns:
+                work_df['analytique'] = work_df['analytique'].apply(lambda x: str(x) if pd.notna(x) and x != '' else None)
+            else:
                 work_df['analytique'] = None
 
         except Exception:
@@ -219,19 +233,19 @@ def run_crystal_analysis(df: pd.DataFrame, year: int) -> Optional[Dict[str, Any]
 
             journal_col = get_col(df, ['Journal', 'journal', 'JOURNAL'])
             if journal_col is not None:
-                work_df['journal'] = journal_col.astype(str).str[:10]
+                work_df['journal'] = journal_col.fillna('OD').astype(str).str[:10].replace('nan', 'OD').replace('None', 'OD')
             else:
                 work_df['journal'] = 'OD'
 
             libelle_col = get_col(df, ['Libelle', 'libelle', 'LIBELLE'])
             if libelle_col is not None:
-                work_df['libelle'] = libelle_col.astype(str).str[:200]
+                work_df['libelle'] = libelle_col.fillna('').astype(str).str[:200].replace('nan', '').replace('None', '')
             else:
                 work_df['libelle'] = ''
 
             piece_col = get_col(df, ['Piece', 'piece', 'PIECE'])
             if piece_col is not None:
-                work_df['piece'] = piece_col.astype(str).str[:50]
+                work_df['piece'] = piece_col.fillna('').astype(str).str[:50].replace('nan', '').replace('None', '')
             else:
                 work_df['piece'] = ''
 
@@ -243,7 +257,7 @@ def run_crystal_analysis(df: pd.DataFrame, year: int) -> Optional[Dict[str, Any]
 
             analytique_col = get_col(df, ['Analytique', 'analytique', 'ANALYTIQUE'])
             if analytique_col is not None:
-                work_df['analytique'] = analytique_col.where(pd.notna(analytique_col), None)
+                work_df['analytique'] = analytique_col.apply(lambda x: str(x) if pd.notna(x) and x != '' else None)
             else:
                 work_df['analytique'] = None
 
