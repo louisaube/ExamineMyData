@@ -45,6 +45,7 @@ from .fdr_filter import (
     fdr_filter_simple,
     FDRResult,
 )
+from .runner import Layer2Runner, Layer2Result, run_layer2
 
 __all__ = [
     # Base
@@ -70,4 +71,8 @@ __all__ = [
     "fdr_filter",
     "fdr_filter_simple",
     "FDRResult",
+    # Runner
+    "Layer2Runner",
+    "Layer2Result",
+    "run_layer2",
 ]
