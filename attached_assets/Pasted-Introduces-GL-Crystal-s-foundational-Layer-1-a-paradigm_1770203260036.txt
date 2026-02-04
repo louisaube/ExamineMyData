@@ -1,0 +1,58 @@
+Introduces GL Crystal's foundational Layer 1: a paradigm shift from line-by-line analysis to topological analysis of general ledger data. The core innovation is the Indice de Cristallinité Comptable (ICC) - a composite metric measuring the homogeneity and predictability of account-analytical code couples.
+
+Key Changes
+Architecture & Foundation
+gl_crystal/__init__.py: Package initialization with 5 founding principles:
+P1: Analyze containers (account + analytical code), not individual lines
+P2: Counterparty as certificate of origin
+P3: Two topologies (static PCG vs emergent), one signal
+P4: Peer comparison beats algorithms
+P5: Dynamic control beats static control
+Layer 1: Crystallinity Analysis
+layer1_crystallinity/icc_calculator.py: Core ICC computation engine
+
+ICCCalculator: Main class computing ICC for all couples
+ICCScore: Dataclass holding composite and per-axis scores
+CoupleAnalysis: Detailed analysis container for each (account, analytical) pair
+ICCResults: Results container with filtering and aggregation methods
+Z-score computation relative to account family peers
+layer1_crystallinity/metrics.py: Five measurement axes
+
+Montants (Amounts): Coefficient of variation decomposed by supplier/month
+Libellés (Labels): Shannon entropy on TF-IDF tokenized descriptions
+Temporalité (Temporality): Autocorrelation + monthly regularity
+Journaux (Journals): Source journal purity (single journal = crystalline)
+Contreparties (Counterparties): Herfindahl concentration index
+layer1_crystallinity/zscore.py: Family-relative anomaly detection
+
+Z-score computation within account families (e.g., 641 salaries vs 606 supplies)
+Mahalanobis distance for multidimensional outlier detection
+Family statistics for understanding "normal" behavior per account type
+Layer 2: Counterparty Graph (Foundation)
+layer2_graph/__init__.py: Module structure for bipartite graph analysis
+layer2_graph/arc_stability.py: Arc mutation detection
+ArcMutation: Represents changes in counterparty patterns
+ArcStabilityAnalyzer: Detects new arcs, disappeared arcs, volume spikes/drops
+Jaccard distance for month-to-month graph comparison
+KL divergence for volume distribution changes
+Notable Implementation Details
+ICC Scoring Logic
+Range: 0 (amorphe/chaotic) to 1 (cristallin/homogeneous)
+Classification:
+≥0.7: Crystalline (predictable, homogeneous)
+0.4-0.7: Vitreous (mixed)
+<0.4: Amorphous (chaotic, heterogeneous)
+Composite: Equally weighted (20% each) across 5 axes, normalized to 0-1
+Grain of Analysis
+Unit: Couple (compte_général, code_analytique), not individual lines
+Temporal: Monthly aggregation for stability analysis
+Relative: Z-scores computed within account families, not absolute
+Key Methods
+ICCCalculator.compute(): End-to-end ICC computation with family z-scores
+ICCResults.get_alertes_zscore(): Identify couples abnormally amorphous vs peers
+ArcStabilityAnalyzer.analyze(): Detect counterparty pattern mutations
+compute_icc_composite(): Weighted aggregation of 5 axes into single score
+Design Principles
+Peer Comparison: Z-scores measure deviation from family, not absolute values
+Topological Focus: Analyzes patterns and relationships, not individual transactions
+**
