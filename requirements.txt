@@ -21,3 +21,7 @@ sentence-transformers>=2.2.0
 
 # Development
 pytest>=7.0.0
+fastapi
+numba
+polars
+uvicorn
