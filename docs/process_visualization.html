@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExamineMyData - Processus de bout en bout</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e0e0e0;
+        }
+
+        h1 {
+            text-align: center;
+            color: #00d9ff;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Pipeline principale */
+        .main-pipeline {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        /* Section */
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .section-title {
+            font-size: 1.4em;
+            color: #00d9ff;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-number {
+            background: linear-gradient(135deg, #00d9ff, #0066ff);
+            color: #1a1a2e;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        /* Étapes */
+        .steps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .step {
+            background: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            border-radius: 15px;
+            padding: 15px 20px;
+            min-width: 180px;
+            max-width: 250px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .step:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.2);
+            border-color: #00d9ff;
+        }
+
+        .step-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .step-name {
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+
+        .step-desc {
+            font-size: 0.85em;
+            color: #aaa;
+            line-height: 1.4;
+        }
+
+        /* Flèches entre sections */
+        .arrow-down {
+            display: flex;
+            justify-content: center;
+            margin: 5px 0;
+        }
+
+        .arrow-down svg {
+            width: 40px;
+            height: 40px;
+            fill: #00d9ff;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(5px); }
+        }
+
+        /* Grille d'analyse */
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .analysis-card {
+            background: linear-gradient(145deg, rgba(0, 100, 150, 0.2), rgba(0, 50, 100, 0.1));
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(0, 217, 255, 0.2);
+        }
+
+        .analysis-card.tier1 {
+            border-color: rgba(0, 255, 136, 0.3);
+            background: linear-gradient(145deg, rgba(0, 150, 100, 0.15), rgba(0, 100, 50, 0.1));
+        }
+
+        .analysis-card.tier2 {
+            border-color: rgba(255, 200, 0, 0.3);
+            background: linear-gradient(145deg, rgba(150, 120, 0, 0.15), rgba(100, 80, 0, 0.1));
+        }
+
+        .analysis-card.tier3 {
+            border-color: rgba(255, 100, 100, 0.3);
+            background: linear-gradient(145deg, rgba(150, 50, 50, 0.15), rgba(100, 30, 30, 0.1));
+        }
+
+        .analysis-card.tier4 {
+            border-color: rgba(180, 100, 255, 0.3);
+            background: linear-gradient(145deg, rgba(100, 50, 150, 0.15), rgba(60, 30, 100, 0.1));
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .card-icon {
+            font-size: 1.8em;
+        }
+
+        .card-title {
+            font-weight: bold;
+            color: #fff;
+            font-size: 1.1em;
+        }
+
+        .card-tier {
+            font-size: 0.75em;
+            padding: 3px 8px;
+            border-radius: 10px;
+            margin-left: auto;
+        }
+
+        .tier1 .card-tier { background: rgba(0, 255, 136, 0.3); color: #00ff88; }
+        .tier2 .card-tier { background: rgba(255, 200, 0, 0.3); color: #ffc800; }
+        .tier3 .card-tier { background: rgba(255, 100, 100, 0.3); color: #ff6464; }
+        .tier4 .card-tier { background: rgba(180, 100, 255, 0.3); color: #b464ff; }
+
+        .card-items {
+            list-style: none;
+        }
+
+        .card-items li {
+            padding: 5px 0;
+            font-size: 0.9em;
+            color: #ccc;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .card-items li:last-child {
+            border-bottom: none;
+        }
+
+        /* Outputs */
+        .outputs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .output-card {
+            background: linear-gradient(145deg, rgba(0, 200, 150, 0.15), rgba(0, 150, 100, 0.1));
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(0, 255, 200, 0.2);
+            text-align: center;
+        }
+
+        .output-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .output-title {
+            font-weight: bold;
+            color: #00ffc8;
+            margin-bottom: 10px;
+        }
+
+        .output-details {
+            font-size: 0.85em;
+            color: #aaa;
+        }
+
+        /* Diagramme de flux */
+        .flow-diagram {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            overflow-x: auto;
+        }
+
+        .flow-diagram h2 {
+            color: #00d9ff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .mermaid-container {
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Légende */
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 5px;
+        }
+
+        .legend-color.core { background: linear-gradient(135deg, #00ff88, #00cc66); }
+        .legend-color.advanced { background: linear-gradient(135deg, #ffc800, #ff9900); }
+        .legend-color.ai { background: linear-gradient(135deg, #ff6464, #cc3333); }
+        .legend-color.crystal { background: linear-gradient(135deg, #b464ff, #8833ff); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8em; }
+            .section { padding: 15px; }
+            .step { min-width: 150px; }
+        }
+
+        /* Architecture diagram */
+        .architecture {
+            margin-top: 40px;
+        }
+
+        .arch-svg {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ExamineMyData</h1>
+        <p class="subtitle">Processus d'analyse GL de bout en bout</p>
+
+        <div class="main-pipeline">
+            <!-- ENTRÉE -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-number">1</span>
+                    Entrée des données
+                </h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-icon">📁</div>
+                        <div class="step-name">Upload fichier GL</div>
+                        <div class="step-desc">Excel (.xlsx) ou CSV<br>Format: Sage, Cegid, Quadratus, EBP</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">📅</div>
+                        <div class="step-name">Mode d'analyse</div>
+                        <div class="step-desc">1 fichier = Analyse annuelle<br>2 fichiers = Comparaison N/N-1</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">🔄</div>
+                        <div class="step-name">Validation</div>
+                        <div class="step-desc">Vérification format, taille<br>Création job_id asynchrone</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arrow-down">
+                <svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-6-6m6 6l6-6m-6 10v-4"/></svg>
+            </div>
+
+            <!-- CHARGEMENT -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-number">2</span>
+                    Chargement & Normalisation
+                </h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-icon">🔍</div>
+                        <div class="step-name">GLLoader</div>
+                        <div class="step-desc">Détection auto du format<br>Mapping des colonnes</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">📊</div>
+                        <div class="step-name">Normalisation</div>
+                        <div class="step-desc">Colonnes standardisées:<br>date, compte, libelle, debit, credit</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">🏷️</div>
+                        <div class="step-name">GLClassifier</div>
+                        <div class="step-desc">Classification des écritures<br>Charges/Produits/Actif/Passif</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">📈</div>
+                        <div class="step-name">Enrichissement</div>
+                        <div class="step-desc">Calcul: période, année, mois<br>classe comptable, montant</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arrow-down">
+                <svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-6-6m6 6l6-6m-6 10v-4"/></svg>
+            </div>
+
+            <!-- ANALYSES -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-number">3</span>
+                    Moteur d'Analyse Multi-Couches
+                </h2>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color core"></div>
+                        <span>Tier 1: Core (toujours)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color advanced"></div>
+                        <span>Tier 2: Avancé (conditionnel)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color ai"></div>
+                        <span>Tier 3: IA/ML (optionnel)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color crystal"></div>
+                        <span>Tier 4: Topologique (v2.0)</span>
+                    </div>
+                </div>
+
+                <div class="analysis-grid" style="margin-top: 25px;">
+                    <!-- Tier 1 -->
+                    <div class="analysis-card tier1">
+                        <div class="card-header">
+                            <span class="card-icon">📊</span>
+                            <span class="card-title">Profiler</span>
+                            <span class="card-tier">CORE</span>
+                        </div>
+                        <ul class="card-items">
+                            <li>Statistiques de base</li>
+                            <li>Profils par colonne</li>
+                            <li>Qualité des données</li>
+                            <li>Valeurs manquantes</li>
+                        </ul>
+                    </div>
+
+                    <div class="analysis-card tier1">
+                        <div class="card-header">
+                            <span class="card-icon">🎯</span>
+                            <span class="card-title">AnomalyDetector</span>
+                            <span class="card-tier">CORE</span>
+                        </div>
+                        <ul class="card-items">
+                            <li>Détection concentrations (>50% sur un mois)</li>
+                            <li>Montants ronds suspects</li>
+                            <li>Patterns mensuels anormaux</li>
+                            <li>Z-score par compte</li>
+                        </ul>
+                    </div>
+
+                    <div class="analysis-card tier1">
+                        <div class="card-header">
+                            <span class="card-icon">🔄</span>
+                            <span class="card-title">RegularizationDetector</span>
+                            <span class="card-tier">CORE</span>
+                        </div>
+                        <ul class="card-items">
+                            <li>Provisions (68x) & reprises (78x)</li>
+                            <li>Matching dotations/reprises</li>
+                            <li>Calcul impact net</li>
+                            <li>Reprises orphelines</li>
+                        </ul>
+                    </div>
+
+                    <div class="analysis-card tier1">
+                        <div class="card-header">
+                            <span class="card-icon">📉</span>
+                            <span class="card-title">PnLNormalizer</span>
+                            <span class="card-tier">CORE</span>
+                        </div>
+                        <ul class="card-items">
+                            <li>Run rate = Total / 12 mois</li>
+                            <li>Comparaison décembre vs moyenne</li>
+                            <li>Écart de normalisation</li>
+                            <li>P&L opérationnel normalisé</li>
+                        </ul>
+                    </div>
+
+                    <div class="analysis-card tier1">
+                        <div class="card-header">
+                            <span class="card-icon">📚</span>
+                            <span class="card-title">AccountingContext (PCG)</span>
+                            <span class="card-tier">CORE</span>
+                        </div>
+                        <ul class="card-items">
+                            <li>Plan Comptable Général</li>
+                            <li>Classification des comptes</li>
+                            <li>Comportement attendu</li>
+                            <li>Contextualisation anomalies</li>
+                        </ul>
+                    </div>
+
+                    <!-- Tier 2 -->
+                    <div class="analysis-card tier2">
+                        <div class="card-header">
+                            <span class="card-icon">📈</span>
+                            <span class="card-title">AdvancedStats</span>
+                            <span class="card-tier">AVANCÉ</span>
+                        </div>
+                        <ul class="card-items">
+                            <li>MAD (Median Absolute Deviation)</li>
+                            <li>IQR (Interquartile Range)</li>
+                            <li>Décomposition saisonnière</li>
+                            <li>Clustering comportemental</li>
+                        </ul>
+                    </div>
+
+                    <!-- Tier 3 -->
+                    <div class="analysis-card tier3">
+                        <div class="card-header">
+                            <span class="card-icon">🤖</span>
+                            <span class="card-title">AI Pipeline</span>
+                            <span class="card-tier">IA/ML</span>
+                        </div>
+                        <ul class="card-items">
+                            <li>Benford's Law (chiffres fabriqués)</li>
+                            <li>Isolation Forest (anomalies)</li>
+                            <li>NLP sur libellés</li>
+                            <li>Risk Score combiné (0-100)</li>
+                        </ul>
+                    </div>
+
+                    <!-- Tier 4 -->
+                    <div class="analysis-card tier4">
+                        <div class="card-header">
+                            <span class="card-icon">💎</span>
+                            <span class="card-title">GL Crystal (Topologique)</span>
+                            <span class="card-tier">v2.0</span>
+                        </div>
+                        <ul class="card-items">
+                            <li>Layer 0: 5 univers sémantiques</li>
+                            <li>Layer 1: ICC (Indice Cristallinité)</li>
+                            <li>Layer 2: Graphe contreparties</li>
+                            <li>Layer 3: Embedding vectoriel</li>
+                        </ul>
+                    </div>
+
+                    <div class="analysis-card tier4">
+                        <div class="card-header">
+                            <span class="card-icon">🔬</span>
+                            <span class="card-title">Autonomous Drilldown</span>
+                            <span class="card-tier">v2.0</span>
+                        </div>
+                        <ul class="card-items">
+                            <li>Détection de patterns</li>
+                            <li>Génération de questions</li>
+                            <li>Exécution automatique</li>
+                            <li>Insights contextuels</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arrow-down">
+                <svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-6-6m6 6l6-6m-6 10v-4"/></svg>
+            </div>
+
+            <!-- COMPARAISON N/N-1 -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-number">4</span>
+                    Comparaison N / N-1 (optionnel)
+                </h2>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-icon">📊</div>
+                        <div class="step-name">GLComparator</div>
+                        <div class="step-desc">Analyse des deux années<br>avec même pipeline</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">📈</div>
+                        <div class="step-name">Variations brutes</div>
+                        <div class="step-desc">Delta P&L année sur année<br>Par compte et total</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">🎯</div>
+                        <div class="step-name">Variations normalisées</div>
+                        <div class="step-desc">Run rate N vs Run rate N-1<br>Écart de normalisation</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">🔍</div>
+                        <div class="step-name">Drill-down Top N</div>
+                        <div class="step-desc">Analyse détaillée<br>des principales variations</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arrow-down">
+                <svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-6-6m6 6l6-6m-6 10v-4"/></svg>
+            </div>
+
+            <!-- OUTPUTS -->
+            <div class="section">
+                <h2 class="section-title">
+                    <span class="section-number">5</span>
+                    Sorties & Livrables
+                </h2>
+                <div class="outputs-grid">
+                    <div class="output-card">
+                        <div class="output-icon">🖥️</div>
+                        <div class="output-title">Interface Web</div>
+                        <div class="output-details">
+                            Dashboard interactif<br>
+                            Tableaux triables<br>
+                            Graphiques dynamiques<br>
+                            Qualification des anomalies
+                        </div>
+                    </div>
+                    <div class="output-card">
+                        <div class="output-icon">📑</div>
+                        <div class="output-title">Rapport Excel</div>
+                        <div class="output-details">
+                            Synthèse (brut vs normalisé)<br>
+                            Réconciliation<br>
+                            Anomalies détaillées<br>
+                            Provisions & régularisations<br>
+                            Crystal ICC
+                        </div>
+                    </div>
+                    <div class="output-card">
+                        <div class="output-icon">🔌</div>
+                        <div class="output-title">API REST</div>
+                        <div class="output-details">
+                            /api/status/{job_id}<br>
+                            /api/drilldown/{job_id}<br>
+                            /api/settings/status<br>
+                            Endpoints JSON
+                        </div>
+                    </div>
+                    <div class="output-card">
+                        <div class="output-icon">📊</div>
+                        <div class="output-title">Métriques clés</div>
+                        <div class="output-details">
+                            Score de risque (0-100)<br>
+                            Nb anomalies par sévérité<br>
+                            Impact normalisation<br>
+                            Run rate opérationnel
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagramme d'architecture -->
+        <div class="flow-diagram">
+            <h2>Architecture du Système</h2>
+            <svg class="arch-svg" viewBox="0 0 1200 700" xmlns="http://www.w3.org/2000/svg">
+                <!-- Fond -->
+                <defs>
+                    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+                    </linearGradient>
+                    <linearGradient id="gradCore" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#00ff88;stop-opacity:0.3" />
+                        <stop offset="100%" style="stop-color:#00cc66;stop-opacity:0.2" />
+                    </linearGradient>
+                    <linearGradient id="gradAdvanced" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#ffc800;stop-opacity:0.3" />
+                        <stop offset="100%" style="stop-color:#ff9900;stop-opacity:0.2" />
+                    </linearGradient>
+                    <linearGradient id="gradAI" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#ff6464;stop-opacity:0.3" />
+                        <stop offset="100%" style="stop-color:#cc3333;stop-opacity:0.2" />
+                    </linearGradient>
+                    <linearGradient id="gradCrystal" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#b464ff;stop-opacity:0.3" />
+                        <stop offset="100%" style="stop-color:#8833ff;stop-opacity:0.2" />
+                    </linearGradient>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#00d9ff"/>
+                    </marker>
+                </defs>
+
+                <!-- Entrée -->
+                <g transform="translate(50, 50)">
+                    <rect x="0" y="0" width="150" height="80" rx="10" fill="url(#gradCore)" stroke="#00ff88" stroke-width="2"/>
+                    <text x="75" y="35" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Fichier GL</text>
+                    <text x="75" y="55" text-anchor="middle" fill="#aaa" font-size="11">Excel / CSV</text>
+                </g>
+
+                <!-- Flèche 1 -->
+                <line x1="200" y1="90" x2="280" y2="90" stroke="#00d9ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- GLLoader -->
+                <g transform="translate(290, 50)">
+                    <rect x="0" y="0" width="150" height="80" rx="10" fill="url(#gradCore)" stroke="#00ff88" stroke-width="2"/>
+                    <text x="75" y="35" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">GLLoader</text>
+                    <text x="75" y="55" text-anchor="middle" fill="#aaa" font-size="11">Normalisation</text>
+                </g>
+
+                <!-- Flèche 2 -->
+                <line x1="440" y1="90" x2="520" y2="90" stroke="#00d9ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- GLAnalyzer (central) -->
+                <g transform="translate(530, 30)">
+                    <rect x="0" y="0" width="180" height="120" rx="15" fill="rgba(0, 217, 255, 0.2)" stroke="#00d9ff" stroke-width="3" filter="url(#glow)"/>
+                    <text x="90" y="45" text-anchor="middle" fill="#00d9ff" font-size="16" font-weight="bold">GLAnalyzer</text>
+                    <text x="90" y="70" text-anchor="middle" fill="#fff" font-size="12">Orchestrateur</text>
+                    <text x="90" y="90" text-anchor="middle" fill="#aaa" font-size="10">Multi-analyses</text>
+                </g>
+
+                <!-- Modules d'analyse - Tier 1 -->
+                <g transform="translate(780, 30)">
+                    <rect x="0" y="0" width="140" height="50" rx="8" fill="url(#gradCore)" stroke="#00ff88" stroke-width="1.5"/>
+                    <text x="70" y="30" text-anchor="middle" fill="#fff" font-size="12">Profiler</text>
+                </g>
+                <g transform="translate(780, 90)">
+                    <rect x="0" y="0" width="140" height="50" rx="8" fill="url(#gradCore)" stroke="#00ff88" stroke-width="1.5"/>
+                    <text x="70" y="30" text-anchor="middle" fill="#fff" font-size="12">AnomalyDetector</text>
+                </g>
+                <g transform="translate(780, 150)">
+                    <rect x="0" y="0" width="140" height="50" rx="8" fill="url(#gradCore)" stroke="#00ff88" stroke-width="1.5"/>
+                    <text x="70" y="30" text-anchor="middle" fill="#fff" font-size="12">Regularization</text>
+                </g>
+                <g transform="translate(780, 210)">
+                    <rect x="0" y="0" width="140" height="50" rx="8" fill="url(#gradCore)" stroke="#00ff88" stroke-width="1.5"/>
+                    <text x="70" y="30" text-anchor="middle" fill="#fff" font-size="12">PnLNormalizer</text>
+                </g>
+
+                <!-- Flèches vers modules Tier 1 -->
+                <line x1="710" y1="90" x2="780" y2="55" stroke="#00ff88" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+                <line x1="710" y1="90" x2="780" y2="115" stroke="#00ff88" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+                <line x1="710" y1="90" x2="780" y2="175" stroke="#00ff88" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+                <line x1="710" y1="90" x2="780" y2="235" stroke="#00ff88" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+                <!-- Tier 2 -->
+                <g transform="translate(950, 90)">
+                    <rect x="0" y="0" width="140" height="50" rx="8" fill="url(#gradAdvanced)" stroke="#ffc800" stroke-width="1.5"/>
+                    <text x="70" y="30" text-anchor="middle" fill="#fff" font-size="12">AdvancedStats</text>
+                </g>
+                <line x1="920" y1="115" x2="950" y2="115" stroke="#ffc800" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+                <!-- Tier 3 AI -->
+                <g transform="translate(950, 150)">
+                    <rect x="0" y="0" width="140" height="50" rx="8" fill="url(#gradAI)" stroke="#ff6464" stroke-width="1.5"/>
+                    <text x="70" y="20" text-anchor="middle" fill="#fff" font-size="11">AI Pipeline</text>
+                    <text x="70" y="38" text-anchor="middle" fill="#ccc" font-size="9">Benford, IsoForest</text>
+                </g>
+                <line x1="920" y1="175" x2="950" y2="175" stroke="#ff6464" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+                <!-- Section Crystal -->
+                <g transform="translate(530, 200)">
+                    <rect x="0" y="0" width="180" height="140" rx="10" fill="url(#gradCrystal)" stroke="#b464ff" stroke-width="2"/>
+                    <text x="90" y="25" text-anchor="middle" fill="#b464ff" font-size="14" font-weight="bold">GL Crystal v2.0</text>
+                    <text x="90" y="50" text-anchor="middle" fill="#fff" font-size="11">Layer 0: Semantic</text>
+                    <text x="90" y="70" text-anchor="middle" fill="#fff" font-size="11">Layer 1: ICC</text>
+                    <text x="90" y="90" text-anchor="middle" fill="#fff" font-size="11">Layer 2: Graph</text>
+                    <text x="90" y="110" text-anchor="middle" fill="#fff" font-size="11">Layer 3: Embedding</text>
+                </g>
+                <path d="M 620 150 L 620 200" stroke="#b464ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- Autonomous Drilldown -->
+                <g transform="translate(290, 200)">
+                    <rect x="0" y="0" width="180" height="80" rx="10" fill="url(#gradCrystal)" stroke="#b464ff" stroke-width="2"/>
+                    <text x="90" y="30" text-anchor="middle" fill="#b464ff" font-size="14" font-weight="bold">Autonomous</text>
+                    <text x="90" y="50" text-anchor="middle" fill="#fff" font-size="12">Drilldown</text>
+                    <text x="90" y="70" text-anchor="middle" fill="#aaa" font-size="10">Questions auto</text>
+                </g>
+                <path d="M 530 150 L 470 200" stroke="#b464ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- PCG Context -->
+                <g transform="translate(290, 310)">
+                    <rect x="0" y="0" width="180" height="60" rx="10" fill="url(#gradCore)" stroke="#00ff88" stroke-width="2"/>
+                    <text x="90" y="25" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">AccountingContext</text>
+                    <text x="90" y="45" text-anchor="middle" fill="#aaa" font-size="10">PCG Integration</text>
+                </g>
+                <path d="M 380 280 L 380 310" stroke="#00ff88" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- Comparator -->
+                <g transform="translate(530, 380)">
+                    <rect x="0" y="0" width="180" height="70" rx="10" fill="rgba(255, 200, 0, 0.2)" stroke="#ffc800" stroke-width="2"/>
+                    <text x="90" y="28" text-anchor="middle" fill="#ffc800" font-size="14" font-weight="bold">GLComparator</text>
+                    <text x="90" y="50" text-anchor="middle" fill="#fff" font-size="11">N vs N-1</text>
+                </g>
+                <path d="M 620 340 L 620 380" stroke="#ffc800" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- Cache -->
+                <g transform="translate(780, 310)">
+                    <rect x="0" y="0" width="140" height="60" rx="10" fill="rgba(100, 100, 100, 0.3)" stroke="#888" stroke-width="2"/>
+                    <text x="70" y="25" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">AnalysisCache</text>
+                    <text x="70" y="45" text-anchor="middle" fill="#aaa" font-size="10">TTL: 1h</text>
+                </g>
+                <path d="M 710 270 L 780 310" stroke="#888" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- Outputs -->
+                <g transform="translate(50, 450)">
+                    <rect x="0" y="0" width="350" height="200" rx="15" fill="rgba(0, 200, 150, 0.1)" stroke="#00ffc8" stroke-width="2"/>
+                    <text x="175" y="30" text-anchor="middle" fill="#00ffc8" font-size="16" font-weight="bold">OUTPUTS</text>
+
+                    <!-- Web UI -->
+                    <rect x="20" y="50" width="100" height="60" rx="8" fill="rgba(0, 217, 255, 0.2)" stroke="#00d9ff" stroke-width="1"/>
+                    <text x="70" y="75" text-anchor="middle" fill="#fff" font-size="11">Web UI</text>
+                    <text x="70" y="95" text-anchor="middle" fill="#aaa" font-size="9">results.html</text>
+
+                    <!-- Excel -->
+                    <rect x="130" y="50" width="100" height="60" rx="8" fill="rgba(0, 255, 136, 0.2)" stroke="#00ff88" stroke-width="1"/>
+                    <text x="180" y="75" text-anchor="middle" fill="#fff" font-size="11">Excel</text>
+                    <text x="180" y="95" text-anchor="middle" fill="#aaa" font-size="9">Multi-sheet</text>
+
+                    <!-- API -->
+                    <rect x="240" y="50" width="100" height="60" rx="8" fill="rgba(255, 200, 0, 0.2)" stroke="#ffc800" stroke-width="1"/>
+                    <text x="290" y="75" text-anchor="middle" fill="#fff" font-size="11">API REST</text>
+                    <text x="290" y="95" text-anchor="middle" fill="#aaa" font-size="9">JSON</text>
+
+                    <!-- Feuilles Excel détail -->
+                    <text x="20" y="140" fill="#aaa" font-size="10">Feuilles Excel:</text>
+                    <text x="20" y="158" fill="#ccc" font-size="9">• Synthèse • Réconciliation</text>
+                    <text x="20" y="174" fill="#ccc" font-size="9">• Anomalies • Provisions</text>
+                    <text x="20" y="190" fill="#ccc" font-size="9">• Drill-down • Crystal ICC</text>
+                </g>
+
+                <!-- Flèche vers outputs -->
+                <path d="M 530 450 L 400 500" stroke="#00ffc8" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- Reporter -->
+                <g transform="translate(530, 480)">
+                    <rect x="0" y="0" width="180" height="70" rx="10" fill="rgba(0, 200, 150, 0.2)" stroke="#00ffc8" stroke-width="2"/>
+                    <text x="90" y="28" text-anchor="middle" fill="#00ffc8" font-size="14" font-weight="bold">ExcelReporter</text>
+                    <text x="90" y="50" text-anchor="middle" fill="#fff" font-size="11">Génération rapport</text>
+                </g>
+                <path d="M 620 450 L 620 480" stroke="#00ffc8" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- FastAPI -->
+                <g transform="translate(780, 450)">
+                    <rect x="0" y="0" width="180" height="100" rx="10" fill="rgba(255, 100, 100, 0.15)" stroke="#ff6464" stroke-width="2"/>
+                    <text x="90" y="28" text-anchor="middle" fill="#ff6464" font-size="14" font-weight="bold">main.py (FastAPI)</text>
+                    <text x="90" y="50" text-anchor="middle" fill="#fff" font-size="10">GET /</text>
+                    <text x="90" y="65" text-anchor="middle" fill="#fff" font-size="10">POST /analyze</text>
+                    <text x="90" y="80" text-anchor="middle" fill="#fff" font-size="10">GET /results/{id}</text>
+                    <text x="90" y="95" text-anchor="middle" fill="#fff" font-size="10">GET /report/{id}</text>
+                </g>
+                <path d="M 710 520 L 780 500" stroke="#ff6464" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- Utilisateur -->
+                <g transform="translate(1020, 480)">
+                    <circle cx="40" cy="20" r="20" fill="rgba(0, 217, 255, 0.3)" stroke="#00d9ff" stroke-width="2"/>
+                    <text x="40" y="25" text-anchor="middle" fill="#fff" font-size="16">👤</text>
+                    <text x="40" y="60" text-anchor="middle" fill="#fff" font-size="12">Utilisateur</text>
+                </g>
+                <line x1="960" y1="500" x2="1000" y2="500" stroke="#00d9ff" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                <!-- Labels -->
+                <text x="1100" y="55" fill="#00ff88" font-size="11">Tier 1: Core</text>
+                <text x="1100" y="115" fill="#ffc800" font-size="11">Tier 2: Advanced</text>
+                <text x="1100" y="175" fill="#ff6464" font-size="11">Tier 3: AI/ML</text>
+                <text x="1100" y="270" fill="#b464ff" font-size="11">Tier 4: Crystal</text>
+            </svg>
+        </div>
+
+        <!-- Séquence temporelle -->
+        <div class="flow-diagram" style="margin-top: 30px;">
+            <h2>Séquence d'Exécution</h2>
+            <svg class="arch-svg" viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg">
+                <!-- Timeline -->
+                <line x1="50" y1="150" x2="1150" y2="150" stroke="#444" stroke-width="3"/>
+
+                <!-- Étapes -->
+                <g transform="translate(80, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#00ff88" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">1</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">Upload</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">0%</text>
+                </g>
+
+                <g transform="translate(180, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#00ff88" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">2</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">Load</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">10%</text>
+                </g>
+
+                <g transform="translate(280, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#00ff88" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">3</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">Profile</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">40%</text>
+                </g>
+
+                <g transform="translate(380, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#00ff88" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">4</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">Detect</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">50%</text>
+                </g>
+
+                <g transform="translate(480, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#00ff88" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">5</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">Régul.</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">60%</text>
+                </g>
+
+                <g transform="translate(580, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#00ff88" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">6</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">RunRate</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">75%</text>
+                </g>
+
+                <g transform="translate(680, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#ffc800" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">7</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">Stats+</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">80%</text>
+                </g>
+
+                <g transform="translate(780, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#ff6464" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">8</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">AI</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">88%</text>
+                </g>
+
+                <g transform="translate(880, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#b464ff" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">9</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">Crystal</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">96%</text>
+                </g>
+
+                <g transform="translate(980, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#b464ff" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">10</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">Drilldown</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">98%</text>
+                </g>
+
+                <g transform="translate(1080, 100)">
+                    <circle cx="0" cy="50" r="25" fill="#00ffc8" opacity="0.8"/>
+                    <text x="0" y="55" text-anchor="middle" fill="#1a1a2e" font-weight="bold">11</text>
+                    <text x="0" y="95" text-anchor="middle" fill="#fff" font-size="11">Output</text>
+                    <text x="0" y="110" text-anchor="middle" fill="#888" font-size="9">100%</text>
+                </g>
+
+                <!-- Légende bas -->
+                <g transform="translate(50, 220)">
+                    <rect x="0" y="0" width="20" height="20" rx="3" fill="#00ff88"/>
+                    <text x="30" y="15" fill="#aaa" font-size="11">Core (toujours)</text>
+
+                    <rect x="150" y="0" width="20" height="20" rx="3" fill="#ffc800"/>
+                    <text x="180" y="15" fill="#aaa" font-size="11">Advanced</text>
+
+                    <rect x="280" y="0" width="20" height="20" rx="3" fill="#ff6464"/>
+                    <text x="310" y="15" fill="#aaa" font-size="11">AI/ML</text>
+
+                    <rect x="380" y="0" width="20" height="20" rx="3" fill="#b464ff"/>
+                    <text x="410" y="15" fill="#aaa" font-size="11">Topologique</text>
+
+                    <rect x="510" y="0" width="20" height="20" rx="3" fill="#00ffc8"/>
+                    <text x="540" y="15" fill="#aaa" font-size="11">Output</text>
+                </g>
+            </svg>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
+            <p>ExamineMyData - Analyse GL de bout en bout</p>
+            <p style="margin-top: 5px;">Généré automatiquement | Version 2.0</p>
+        </div>
+    </div>
+</body>
+</html>
