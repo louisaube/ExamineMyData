@@ -90,6 +90,11 @@ class RawSignal:
     # Scoring
     raw_score: float = 0.0
 
+    # P-value (Conformal Prediction ou autre méthode distribution-free)
+    pvalue: Optional[float] = None
+    pvalue_adjusted: Optional[float] = None  # Après correction BH-FDR
+    detection_method: str = "threshold"  # "conformal", "matrix_profile", "ecod", "threshold"
+
     # Métadonnées
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -106,15 +111,43 @@ class RawSignal:
 
     @property
     def severity(self) -> str:
-        """Sévérité basée sur le score brut."""
-        if self.raw_score >= 80:
-            return "CRITICAL"
-        elif self.raw_score >= 60:
-            return "HIGH"
-        elif self.raw_score >= 40:
-            return "MEDIUM"
+        """
+        Sévérité basée sur la p-value (si disponible) ou le score brut.
+
+        P-value severity:
+        - p < 0.001: CRITICAL
+        - p < 0.01:  HIGH
+        - p < 0.05:  MEDIUM
+        - p >= 0.05: LOW
+        """
+        if self.pvalue is not None:
+            if self.pvalue < 0.001:
+                return "CRITICAL"
+            elif self.pvalue < 0.01:
+                return "HIGH"
+            elif self.pvalue < 0.05:
+                return "MEDIUM"
+            else:
+                return "LOW"
         else:
-            return "LOW"
+            # Fallback sur raw_score
+            if self.raw_score >= 80:
+                return "CRITICAL"
+            elif self.raw_score >= 60:
+                return "HIGH"
+            elif self.raw_score >= 40:
+                return "MEDIUM"
+            else:
+                return "LOW"
+
+    @property
+    def is_significant(self) -> bool:
+        """True si statistiquement significatif (p < 0.05 ou score élevé)."""
+        if self.pvalue_adjusted is not None:
+            return self.pvalue_adjusted < 0.05
+        if self.pvalue is not None:
+            return self.pvalue < 0.05
+        return self.raw_score >= 50
 
     def to_dict(self) -> Dict[str, Any]:
         """Convertit en dictionnaire pour sérialisation."""
@@ -133,7 +166,11 @@ class RawSignal:
             "signal_si_matched": self.signal_si_matched,
             "non_signal_si_matched": self.non_signal_si_matched,
             "raw_score": self.raw_score,
+            "pvalue": self.pvalue,
+            "pvalue_adjusted": self.pvalue_adjusted,
+            "detection_method": self.detection_method,
             "is_excluded": self.is_excluded,
+            "is_significant": self.is_significant,
             "severity": self.severity,
             "metadata": self.metadata,
         }

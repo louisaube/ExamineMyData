@@ -5,18 +5,166 @@ Fonctions de calibration des seuils pour Layer 2
 Principe clé: Les seuils ne sont pas des constantes mais des fonctions
 du comportement attendu de chaque famille (cv_montant, univers, volume).
 
-Formules:
-- dead_band(cv) = 1.5 + 2.0 * cv_attendu
-  → CRISTALLIN (cv=0.05) : 1.6σ (sensible)
-  → NOMINATIF (cv=1.20)  : 3.9σ (tolérant)
-  → PONCTUEL (cv=2.00)   : 5.5σ (très tolérant)
+V2: Conformal Prediction remplace les seuils heuristiques.
+- conformal_pvalue() : p-value distribution-free avec garantie de couverture
+- dead_band() : fallback pour familles avec < 6 mois de données
 
+Formules legacy (fallback):
+- dead_band(cv) = 1.5 + 2.0 * cv_attendu
 - seuil_materialite = max(plancher, volume * pct_univers)
-  → Jamais alerter sur des montants non significatifs
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Callable, Tuple
+import numpy as np
 from .base import Univers
+
+
+# =============================================================================
+# CONFORMAL PREDICTION (distribution-free p-values)
+# =============================================================================
+
+# Seuil minimum de mois pour utiliser conformal prediction
+MIN_MOIS_CONFORMAL = 6
+
+
+def nonconformity_mad(x: float, calibration_set: List[float]) -> float:
+    """
+    Fonction de non-conformité basée sur MAD (Median Absolute Deviation).
+
+    Plus robuste que l'écart à la moyenne pour les petits échantillons.
+
+    Args:
+        x: Valeur à scorer
+        calibration_set: Échantillon de calibration
+
+    Returns:
+        Score de non-conformité (écart normalisé à la médiane)
+    """
+    if len(calibration_set) == 0:
+        return 0.0
+
+    median = np.median(calibration_set)
+    mad = np.median(np.abs(np.array(calibration_set) - median))
+
+    # Éviter division par zéro
+    if mad == 0:
+        mad = np.std(calibration_set) if len(calibration_set) > 1 else 1.0
+    if mad == 0:
+        mad = 1.0
+
+    return abs(x - median) / mad
+
+
+def conformal_pvalue(
+    x_new: float,
+    calibration_set: List[float],
+    nonconformity_fn: Callable[[float, List[float]], float] = nonconformity_mad
+) -> float:
+    """
+    Calcule une p-value distribution-free via Conformal Prediction.
+
+    Principe (Vovk 2005, Bates et al. 2023):
+    La p-value est la fraction des points de calibration ayant un score
+    de non-conformité >= celui du nouveau point. Aucune hypothèse
+    distributionnelle requise.
+
+    Garantie: Sous échangeabilité, P(p-value <= α) <= α (couverture exacte).
+
+    Args:
+        x_new: Valeur à tester
+        calibration_set: Échantillon de calibration (ex: 11 mois historiques)
+        nonconformity_fn: Fonction de non-conformité (défaut: MAD-based)
+
+    Returns:
+        p-value ∈ (0, 1] - Plus c'est petit, plus c'est anormal
+
+    Examples:
+        >>> conformal_pvalue(1200, [1000, 1005, 998, 1002, 1001, 999])
+        0.14  # pas très anormal
+        >>> conformal_pvalue(2000, [1000, 1005, 998, 1002, 1001, 999])
+        0.14  # très anormal (p-value = 1/7)
+    """
+    if len(calibration_set) < 2:
+        return 1.0  # Pas assez de données, pas de signal
+
+    # Scores de non-conformité pour tous les points
+    scores = [nonconformity_fn(x, calibration_set) for x in calibration_set]
+    score_new = nonconformity_fn(x_new, calibration_set)
+
+    # p-value = (1 + #{scores >= score_new}) / (1 + n)
+    # Le +1 au numérateur et dénominateur garantit p-value ∈ (0, 1]
+    count_geq = sum(1 for s in scores if s >= score_new)
+    pvalue = (1 + count_geq) / (1 + len(scores))
+
+    return pvalue
+
+
+def conformal_pvalue_bilateral(
+    x_new: float,
+    calibration_set: List[float],
+) -> Tuple[float, str]:
+    """
+    P-value conformal avec indication de direction (haut/bas).
+
+    Args:
+        x_new: Valeur à tester
+        calibration_set: Échantillon de calibration
+
+    Returns:
+        (pvalue, direction): p-value et "high" si au-dessus de la médiane, "low" sinon
+    """
+    if len(calibration_set) < 2:
+        return (1.0, "neutral")
+
+    median = np.median(calibration_set)
+    direction = "high" if x_new > median else "low" if x_new < median else "neutral"
+    pvalue = conformal_pvalue(x_new, calibration_set)
+
+    return (pvalue, direction)
+
+
+def conformal_or_fallback(
+    x_new: float,
+    calibration_set: List[float],
+    cv_attendu: float = 1.0,
+    alpha: float = 0.05
+) -> Tuple[float, bool, str]:
+    """
+    Utilise Conformal si assez de données, sinon fallback sur dead_band.
+
+    Args:
+        x_new: Valeur à tester
+        calibration_set: Échantillon de calibration
+        cv_attendu: CV pour fallback dead_band
+        alpha: Seuil de significativité (défaut 0.05)
+
+    Returns:
+        (score, is_signal, method):
+        - score: p-value (conformal) ou z-score (fallback)
+        - is_signal: True si anomalie détectée
+        - method: "conformal" ou "dead_band"
+    """
+    n = len(calibration_set)
+
+    if n >= MIN_MOIS_CONFORMAL:
+        # Conformal prediction
+        pvalue = conformal_pvalue(x_new, calibration_set)
+        return (pvalue, pvalue < alpha, "conformal")
+    else:
+        # Fallback: dead_band heuristique
+        if n < 2:
+            return (1.0, False, "insufficient_data")
+
+        mean = np.mean(calibration_set)
+        std = np.std(calibration_set, ddof=1)
+
+        if std == 0:
+            return (0.0, False, "zero_variance")
+
+        z = abs(x_new - mean) / std
+        threshold = dead_band(cv_attendu)
+
+        return (z, z > threshold, "dead_band")
 
 
 # =============================================================================
