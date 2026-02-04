@@ -1,7 +1,12 @@
 """
-GL Crystal - Calculateur ICC
+GL Crystal - Calculateur ICC v2.0
 
 Calcule l'Indice de Cristallinité Comptable pour chaque couple (compte, analytique).
+
+v2.0: Intégration avec Layer 0 (Classification Sémantique)
+- Poids calibrés par univers
+- Score de "surprise" (déviation vs ICC attendu)
+- Z-score calculé dans univers × famille
 
 Le grain d'analyse est le couple, pas la ligne individuelle.
 C'est le changement de paradigme fondamental de GL Crystal.
@@ -13,6 +18,8 @@ from collections import defaultdict
 import numpy as np
 
 from ..normalizer.schema import GLSchema, EnrichedEntry, NatureCompte
+from ..layer0_classifier import UniversSemantique
+from ..layer0_classifier.univers import UNIVERS_PROFILES, UniversProfile
 from .metrics import (
     compute_cv_decompose,
     compute_entropy_libelles,
@@ -23,12 +30,62 @@ from .metrics import (
 )
 
 
+# Poids calibrés par univers (v2.0)
+# Basés sur les axes_icc_actifs de chaque UniversProfile
+WEIGHTS_BY_UNIVERS = {
+    UniversSemantique.CRISTALLIN: {
+        'montants': 0.25,
+        'libelles': 0.00,  # Désactivé - toujours homogène
+        'temporalite': 0.35,  # Crucial - régularité attendue
+        'journaux': 0.20,
+        'contreparties': 0.20,
+    },
+    UniversSemantique.NOMINATIF: {
+        'montants': 0.30,
+        'libelles': 0.00,  # Désactivé - entropie noms propres attendue
+        'temporalite': 0.25,
+        'journaux': 0.20,
+        'contreparties': 0.25,
+    },
+    UniversSemantique.INVENTAIRE: {
+        'montants': 0.25,
+        'libelles': 0.00,  # Désactivé - réf immo attendues
+        'temporalite': 0.35,  # Crucial - mensuel parfait attendu
+        'journaux': 0.20,
+        'contreparties': 0.20,
+    },
+    UniversSemantique.VENTILATION: {
+        'montants': 0.25,
+        'libelles': 0.15,
+        'temporalite': 0.20,
+        'journaux': 0.20,
+        'contreparties': 0.20,
+    },
+    UniversSemantique.COMPOSITE: {
+        'montants': 0.20,
+        'libelles': 0.25,  # Pertinent - vrai signal
+        'temporalite': 0.15,
+        'journaux': 0.20,
+        'contreparties': 0.20,
+    },
+    UniversSemantique.NON_CLASSE: {
+        'montants': 0.20,
+        'libelles': 0.20,
+        'temporalite': 0.20,
+        'journaux': 0.20,
+        'contreparties': 0.20,
+    },
+}
+
+
 @dataclass
 class ICCScore:
     """
     Score ICC pour un couple (compte, analytique).
 
     Contient le score composite et les scores par axe.
+
+    v2.0: Intègre l'univers sémantique et le score de surprise.
     """
     # Identifiants
     compte: str
@@ -58,6 +115,12 @@ class ICCScore:
     # Z-score par rapport aux pairs
     zscore: Optional[float] = None
 
+    # v2.0: Univers et surprise
+    univers: Optional[UniversSemantique] = None
+    icc_attendu: Optional[float] = None  # ICC attendu pour cet univers
+    surprise: Optional[float] = None  # |icc - icc_attendu|
+    zscore_univers: Optional[float] = None  # Z-score dans univers × famille
+
     def __post_init__(self):
         """Détermine la classification après création."""
         if self.icc >= 0.7:
@@ -67,6 +130,20 @@ class ICCScore:
         else:
             self.classification = "amorphe"
 
+    @property
+    def is_surprising(self) -> bool:
+        """
+        Indique si ce couple est surprenant par rapport à son univers.
+
+        Un couple est surprenant si sa surprise dépasse le seuil de l'univers.
+        """
+        if self.univers is None or self.surprise is None:
+            return False
+        profile = UNIVERS_PROFILES.get(self.univers)
+        if profile is None:
+            return False
+        return self.surprise > profile.seuil_surprise
+
 
 @dataclass
 class CoupleAnalysis:
@@ -74,10 +151,15 @@ class CoupleAnalysis:
     Analyse complète d'un couple (compte, analytique).
 
     Contient les données brutes et les métriques calculées.
+
+    v2.0: Inclut l'univers sémantique.
     """
     compte: str
     analytique: Optional[str]
     famille: str  # Racine à 3 chiffres
+
+    # v2.0: Univers sémantique
+    univers: Optional[UniversSemantique] = None
 
     # Données agrégées
     ecritures: List[EnrichedEntry] = field(default_factory=list)
@@ -94,61 +176,110 @@ class CoupleAnalysis:
     # Score ICC
     icc_score: Optional[ICCScore] = None
 
+    @property
+    def couple_id(self) -> str:
+        """Identifiant unique du couple (format: compte|analytique)."""
+        return f"{self.compte}|{self.analytique or ''}"
+
 
 class ICCCalculator:
     """
-    Calculateur de l'Indice de Cristallinité Comptable.
+    Calculateur de l'Indice de Cristallinité Comptable v2.0.
 
-    Usage:
+    Intègre la classification sémantique (Layer 0) pour:
+    - Appliquer des poids calibrés par univers
+    - Calculer le score de surprise (déviation vs ICC attendu)
+    - Calculer le z-score dans univers × famille
+
+    Usage v2.0:
+        from gl_crystal import SemanticClassifier
+        from gl_crystal.layer1_crystallinity import ICCCalculator
+
+        # Classifie d'abord
+        classifier = SemanticClassifier()
+        classification = classifier.classify(schema)
+
+        # Puis calcule l'ICC avec classification
         calculator = ICCCalculator()
-        results = calculator.compute(schema)
+        results = calculator.compute(schema, classification=classification)
 
-        # Accès aux scores
-        for score in results.scores:
-            print(f"{score.compte}/{score.analytique}: ICC={score.icc:.2f}")
+        # Accès aux alertes pertinentes
+        alertes = results.get_alertes_surprise()
 
-        # Heatmap data
-        heatmap = calculator.get_heatmap_data(results)
+    Usage legacy (sans classification):
+        calculator = ICCCalculator()
+        results = calculator.compute(schema)  # Poids uniformes
     """
 
-    def __init__(self, weights: Optional[Dict[str, float]] = None):
+    def __init__(
+        self,
+        weights: Optional[Dict[str, float]] = None,
+        use_univers_weights: bool = True
+    ):
         """
         Initialise le calculateur.
 
         Args:
-            weights: Poids des axes ICC (optionnel)
+            weights: Poids des axes ICC (optionnel, override univers)
+            use_univers_weights: Utiliser les poids calibrés par univers (v2.0)
         """
-        self.weights = weights or {
+        self.default_weights = weights or {
             'montants': 0.20,
             'libelles': 0.20,
             'temporalite': 0.20,
             'journaux': 0.20,
             'contreparties': 0.20,
         }
+        self.use_univers_weights = use_univers_weights
+        # Pour compatibilité avec ancien code
+        self.weights = self.default_weights
 
-    def compute(self, schema: GLSchema,
-                filter_nature: Optional[Set[NatureCompte]] = None) -> 'ICCResults':
+    def compute(
+        self,
+        schema: GLSchema,
+        filter_nature: Optional[Set[NatureCompte]] = None,
+        classification: Optional['ClassificationResults'] = None
+    ) -> 'ICCResults':
         """
         Calcule l'ICC pour tous les couples du GL.
 
         Args:
             schema: GLSchema enrichi
             filter_nature: Filtrer par nature de compte (ex: {CHARGE, PRODUIT})
+            classification: Résultats de classification Layer 0 (v2.0)
 
         Returns:
             ICCResults contenant les scores et analyses
         """
+        # Build classification lookup si fournie
+        # Note: couple_id format is "compte|analytique" (pipe separator)
+        univers_by_couple: Dict[str, UniversSemantique] = {}
+        if classification:
+            for result in classification.classifications:
+                univers_by_couple[result.couple_id] = result.univers
+
         # Groupe les écritures par couple
         couples = self._group_by_couple(schema.entries, filter_nature)
 
         # Analyse chaque couple
         analyses = []
         for (compte, analytique), ecritures in couples.items():
-            analysis = self._analyze_couple(compte, analytique, ecritures)
+            # Match the couple_id format used by classifier: "compte|analytique"
+            couple_id = f"{compte}|{analytique or ''}"
+            univers = univers_by_couple.get(couple_id, UniversSemantique.NON_CLASSE)
+            analysis = self._analyze_couple(
+                compte, analytique, ecritures, univers
+            )
             analyses.append(analysis)
 
-        # Calcule les z-scores par famille
+        # Calcule les z-scores par famille (legacy)
         self._compute_zscores(analyses)
+
+        # v2.0: Calcule les z-scores par univers × famille
+        self._compute_zscores_univers(analyses)
+
+        # v2.0: Calcule les scores de surprise
+        self._compute_surprise_scores(analyses)
 
         # Construit les résultats
         return ICCResults(
@@ -157,6 +288,7 @@ class ICCCalculator:
             n_ecritures=len(schema.entries),
             familles=self._get_familles(analyses),
             analytiques=self._get_analytiques(analyses),
+            has_classification=(classification is not None),
         )
 
     def _group_by_couple(
@@ -181,9 +313,14 @@ class ICCCalculator:
         self,
         compte: str,
         analytique: Optional[str],
-        ecritures: List[EnrichedEntry]
+        ecritures: List[EnrichedEntry],
+        univers: Optional[UniversSemantique] = None
     ) -> CoupleAnalysis:
-        """Analyse un couple et calcule son ICC."""
+        """
+        Analyse un couple et calcule son ICC.
+
+        v2.0: Utilise les poids calibrés par univers si disponible.
+        """
         # Extrait les données pour les métriques
         montants = [e.montant_signe for e in ecritures]
         libelles = [e.libelle_ecriture for e in ecritures]
@@ -207,11 +344,17 @@ class ICCCalculator:
         journaux_metrics = compute_diversite_journaux(journaux)
         contreparties_metrics = compute_concentration_contreparties(contreparties)
 
+        # v2.0: Détermine les poids à utiliser
+        if self.use_univers_weights and univers is not None:
+            weights = WEIGHTS_BY_UNIVERS.get(univers, self.default_weights)
+        else:
+            weights = self.default_weights
+
         # Calcul de l'ICC composite
         icc = compute_icc_composite(
             cv_metrics, entropy_metrics, regularite_metrics,
             journaux_metrics, contreparties_metrics,
-            self.weights
+            weights
         )
 
         # Scores par axe (pour le détail)
@@ -221,6 +364,13 @@ class ICCCalculator:
         score_temporalite = regularite_metrics.get('score_regularite', 0.5)
         score_journaux = journaux_metrics.get('score_purete', 1.0)
         score_contreparties = contreparties_metrics.get('herfindahl', 1.0)
+
+        # v2.0: Récupère l'ICC attendu pour l'univers
+        icc_attendu = None
+        if univers is not None:
+            profile = UNIVERS_PROFILES.get(univers)
+            if profile:
+                icc_attendu = profile.icc_attendu
 
         # Crée le score ICC
         icc_score = ICCScore(
@@ -238,6 +388,8 @@ class ICCCalculator:
             n_mois=len(set(mois)),
             n_journaux=journaux_metrics.get('n_journaux', 0),
             n_contreparties=contreparties_metrics.get('n_contreparties', 0),
+            univers=univers,
+            icc_attendu=icc_attendu,
         )
 
         # Famille (racine 3 chiffres)
@@ -247,6 +399,7 @@ class ICCCalculator:
             compte=compte,
             analytique=analytique,
             famille=famille,
+            univers=univers,
             ecritures=ecritures,
             montant_total=sum(abs(m) for m in montants),
             n_ecritures=len(ecritures),
@@ -260,7 +413,7 @@ class ICCCalculator:
 
     def _compute_zscores(self, analyses: List[CoupleAnalysis]):
         """
-        Calcule les z-scores par famille.
+        Calcule les z-scores par famille (legacy).
 
         Le z-score mesure la déviation d'un couple par rapport aux autres
         couples de la même famille de comptes.
@@ -298,6 +451,63 @@ class ICCCalculator:
                             (a.icc_score.icc - mean_icc) / std_icc
                         )
 
+    def _compute_zscores_univers(self, analyses: List[CoupleAnalysis]):
+        """
+        Calcule les z-scores par univers × famille (v2.0).
+
+        Le z-score est calculé DANS le groupe des couples qui partagent
+        le même univers ET la même famille de comptes.
+
+        Ceci évite les faux positifs: un couple NOMINATIF n'est pas comparé
+        aux couples CRISTALLIN même s'ils ont la même famille.
+        """
+        # Groupe par (univers, famille)
+        by_group: Dict[Tuple[UniversSemantique, str], List[CoupleAnalysis]] = defaultdict(list)
+        for analysis in analyses:
+            key = (analysis.univers or UniversSemantique.NON_CLASSE, analysis.famille)
+            by_group[key].append(analysis)
+
+        # Calcule le z-score pour chaque groupe
+        for (univers, famille), group_analyses in by_group.items():
+            if len(group_analyses) < 2:
+                for a in group_analyses:
+                    if a.icc_score:
+                        a.icc_score.zscore_univers = 0.0
+                continue
+
+            icc_values = [a.icc_score.icc for a in group_analyses if a.icc_score]
+            if not icc_values or len(icc_values) < 2:
+                continue
+
+            mean_icc = np.mean(icc_values)
+            std_icc = np.std(icc_values)
+
+            if std_icc == 0:
+                for a in group_analyses:
+                    if a.icc_score:
+                        a.icc_score.zscore_univers = 0.0
+            else:
+                for a in group_analyses:
+                    if a.icc_score:
+                        a.icc_score.zscore_univers = float(
+                            (a.icc_score.icc - mean_icc) / std_icc
+                        )
+
+    def _compute_surprise_scores(self, analyses: List[CoupleAnalysis]):
+        """
+        Calcule les scores de surprise (v2.0).
+
+        surprise = |ICC_observé - ICC_attendu_pour_univers|
+
+        Un couple est "surprenant" si son ICC s'éloigne de l'ICC
+        typiquement attendu pour son univers sémantique.
+        """
+        for analysis in analyses:
+            if analysis.icc_score and analysis.icc_score.icc_attendu is not None:
+                analysis.icc_score.surprise = abs(
+                    analysis.icc_score.icc - analysis.icc_score.icc_attendu
+                )
+
     def _get_familles(self, analyses: List[CoupleAnalysis]) -> Set[str]:
         """Retourne l'ensemble des familles de comptes."""
         return {a.famille for a in analyses}
@@ -310,18 +520,20 @@ class ICCCalculator:
 @dataclass
 class ICCResults:
     """
-    Résultats du calcul ICC.
+    Résultats du calcul ICC v2.0.
 
     Contient:
     - Les analyses détaillées par couple
     - Les statistiques globales
     - Les méthodes d'accès et de filtrage
+    - v2.0: Accès aux alertes par surprise et par univers
     """
     analyses: List[CoupleAnalysis]
     n_couples: int
     n_ecritures: int
     familles: Set[str]
     analytiques: Set[str]
+    has_classification: bool = False  # v2.0: True si classification fournie
 
     @property
     def scores(self) -> List[ICCScore]:
@@ -338,12 +550,36 @@ class ICCResults:
 
     def get_alertes_zscore(self, threshold: float = -2.0) -> List[ICCScore]:
         """
-        Retourne les couples avec z-score significativement bas.
+        Retourne les couples avec z-score significativement bas (legacy).
 
         Ces couples sont anormalement amorphes par rapport à leurs pairs.
         """
         return [s for s in self.scores
                 if s.zscore is not None and s.zscore < threshold]
+
+    def get_alertes_zscore_univers(self, threshold: float = -2.0) -> List[ICCScore]:
+        """
+        v2.0: Retourne les couples avec z-score bas dans leur univers × famille.
+
+        Plus précis que get_alertes_zscore car compare aux vrais pairs.
+        """
+        return [s for s in self.scores
+                if s.zscore_univers is not None and s.zscore_univers < threshold]
+
+    def get_alertes_surprise(self) -> List[ICCScore]:
+        """
+        v2.0: Retourne les couples "surprenants".
+
+        Un couple est surprenant si son ICC s'écarte significativement
+        de l'ICC attendu pour son univers sémantique.
+
+        C'est la méthode recommandée en v2.0 pour identifier les anomalies.
+        """
+        return [s for s in self.scores if s.is_surprising]
+
+    def get_by_univers(self, univers: UniversSemantique) -> List[ICCScore]:
+        """v2.0: Retourne les scores d'un univers sémantique."""
+        return [s for s in self.scores if s.univers == univers]
 
     def get_by_famille(self, famille: str) -> List[ICCScore]:
         """Retourne les scores d'une famille de comptes."""
@@ -381,7 +617,9 @@ class ICCResults:
             }
 
         icc_values = [s.icc for s in self.scores]
-        return {
+
+        # Stats de base
+        stats = {
             'n_couples': len(self.scores),
             'icc_mean': float(np.mean(icc_values)),
             'icc_std': float(np.std(icc_values)),
@@ -392,6 +630,24 @@ class ICCResults:
             'n_analytiques': len(self.analytiques),
         }
 
+        # v2.0: Stats par univers
+        if self.has_classification:
+            stats['has_classification'] = True
+            stats['n_alertes_surprise'] = len(self.get_alertes_surprise())
+
+            # Répartition par univers
+            by_univers = {}
+            for univers in UniversSemantique:
+                scores_univers = self.get_by_univers(univers)
+                if scores_univers:
+                    by_univers[univers.value] = {
+                        'n_couples': len(scores_univers),
+                        'icc_mean': float(np.mean([s.icc for s in scores_univers])),
+                    }
+            stats['by_univers'] = by_univers
+
+        return stats
+
     def top_amorphes(self, n: int = 20) -> List[ICCScore]:
         """Retourne les N couples les plus amorphes."""
         return sorted(self.scores, key=lambda s: s.icc)[:n]
@@ -399,3 +655,8 @@ class ICCResults:
     def bottom_amorphes(self, n: int = 20) -> List[ICCScore]:
         """Retourne les N couples les plus cristallins."""
         return sorted(self.scores, key=lambda s: s.icc, reverse=True)[:n]
+
+    def top_surprises(self, n: int = 20) -> List[ICCScore]:
+        """v2.0: Retourne les N couples les plus surprenants."""
+        scores_with_surprise = [s for s in self.scores if s.surprise is not None]
+        return sorted(scores_with_surprise, key=lambda s: s.surprise, reverse=True)[:n]

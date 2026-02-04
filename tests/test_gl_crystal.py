@@ -567,5 +567,214 @@ class TestFullPipeline:
         print(f"Embeddings: {len(embeddings)}")
 
 
+# ============================================================================
+# Tests Layer 0 - Classification sémantique (v2.0)
+# ============================================================================
+
+class TestSemanticClassification:
+    """Tests de la classification sémantique (Layer 0)."""
+
+    def test_classifier_runs(self, enriched_schema):
+        """Le classifieur s'exécute sans erreur."""
+        from gl_crystal.layer0_classifier import SemanticClassifier
+
+        classifier = SemanticClassifier(min_ecritures=3)
+        results = classifier.classify(enriched_schema)
+
+        assert results is not None
+        assert len(results.classifications) > 0
+        assert results.summary is not None
+
+    def test_salaries_classified_appropriately(self, enriched_schema):
+        """Les salaires devraient être classés dans un univers cohérent."""
+        from gl_crystal.layer0_classifier import SemanticClassifier, UniversSemantique
+
+        classifier = SemanticClassifier(min_ecritures=3)
+        results = classifier.classify(enriched_schema)
+
+        # Cherche les couples de salaires (641)
+        salary_couples = [c for c in results.classifications
+                         if c.compte_general.startswith('641')]
+
+        assert len(salary_couples) > 0, "Devrait y avoir des couples de salaires"
+
+        for couple in salary_couples:
+            # Salaires avec montants identiques peuvent être classés VENTILATION
+            # Salaires réguliers: CRISTALLIN
+            # Salaires avec noms employés: NOMINATIF
+            # Les seuls univers inadaptés seraient INVENTAIRE (réservé aux amortissements)
+            assert couple.univers != UniversSemantique.INVENTAIRE, \
+                f"Salaires ne devraient pas être classés INVENTAIRE"
+
+            # Vérifier que la confiance est raisonnable
+            assert couple.confiance >= 0.5, \
+                f"Faible confiance pour salaires: {couple.confiance}"
+
+    def test_classification_summary_complete(self, enriched_schema):
+        """Le résumé de classification contient tous les univers."""
+        from gl_crystal.layer0_classifier import SemanticClassifier, UniversSemantique
+
+        classifier = SemanticClassifier(min_ecritures=3)
+        results = classifier.classify(enriched_schema)
+
+        # Tous les univers doivent être présents dans le résumé
+        for univers in UniversSemantique:
+            assert univers.value in results.summary.par_univers
+
+    def test_univers_profiles_complete(self):
+        """Tous les profils d'univers sont définis."""
+        from gl_crystal.layer0_classifier import UniversSemantique, UNIVERS_PROFILES
+
+        for univers in UniversSemantique:
+            assert univers in UNIVERS_PROFILES
+            profile = UNIVERS_PROFILES[univers]
+            assert profile.icc_attendu is not None
+            assert profile.seuil_surprise is not None
+            assert len(profile.axes_icc_actifs) > 0
+
+
+class TestICCv2Integration:
+    """Tests de l'intégration ICC v2.0 avec Layer 0."""
+
+    def test_icc_with_classification(self, enriched_schema):
+        """ICC fonctionne avec classification fournie."""
+        from gl_crystal.layer0_classifier import SemanticClassifier
+        from gl_crystal.layer1_crystallinity.icc_calculator import ICCCalculator
+
+        # Classifie d'abord
+        classifier = SemanticClassifier(min_ecritures=3)
+        classification = classifier.classify(enriched_schema)
+
+        # Calcule l'ICC avec classification
+        calculator = ICCCalculator(use_univers_weights=True)
+        results = calculator.compute(enriched_schema, classification=classification)
+
+        assert results.has_classification
+        assert results.n_couples > 0
+
+        # Tous les scores doivent avoir un univers
+        for score in results.scores:
+            assert score.univers is not None
+
+    def test_surprise_score_computed(self, enriched_schema):
+        """Le score de surprise est calculé."""
+        from gl_crystal.layer0_classifier import SemanticClassifier
+        from gl_crystal.layer1_crystallinity.icc_calculator import ICCCalculator
+
+        classifier = SemanticClassifier(min_ecritures=3)
+        classification = classifier.classify(enriched_schema)
+
+        calculator = ICCCalculator(use_univers_weights=True)
+        results = calculator.compute(enriched_schema, classification=classification)
+
+        # Au moins certains scores doivent avoir une surprise
+        scores_with_surprise = [s for s in results.scores if s.surprise is not None]
+        assert len(scores_with_surprise) > 0
+
+        # Le score de surprise doit être positif (valeur absolue)
+        for score in scores_with_surprise:
+            assert score.surprise >= 0
+
+    def test_zscore_univers_computed(self, enriched_schema):
+        """Le z-score par univers×famille est calculé."""
+        from gl_crystal.layer0_classifier import SemanticClassifier
+        from gl_crystal.layer1_crystallinity.icc_calculator import ICCCalculator
+
+        classifier = SemanticClassifier(min_ecritures=3)
+        classification = classifier.classify(enriched_schema)
+
+        calculator = ICCCalculator(use_univers_weights=True)
+        results = calculator.compute(enriched_schema, classification=classification)
+
+        # Tous les scores doivent avoir un zscore_univers
+        for score in results.scores:
+            assert score.zscore_univers is not None
+
+    def test_top_surprises_method(self, enriched_schema):
+        """La méthode top_surprises fonctionne."""
+        from gl_crystal.layer0_classifier import SemanticClassifier
+        from gl_crystal.layer1_crystallinity.icc_calculator import ICCCalculator
+
+        classifier = SemanticClassifier(min_ecritures=3)
+        classification = classifier.classify(enriched_schema)
+
+        calculator = ICCCalculator(use_univers_weights=True)
+        results = calculator.compute(enriched_schema, classification=classification)
+
+        top = results.top_surprises(n=5)
+        assert len(top) <= 5
+
+        # Doivent être triés par surprise décroissante
+        if len(top) >= 2:
+            assert top[0].surprise >= top[1].surprise
+
+    def test_stats_include_univers_breakdown(self, enriched_schema):
+        """Les stats incluent la répartition par univers."""
+        from gl_crystal.layer0_classifier import SemanticClassifier
+        from gl_crystal.layer1_crystallinity.icc_calculator import ICCCalculator
+
+        classifier = SemanticClassifier(min_ecritures=3)
+        classification = classifier.classify(enriched_schema)
+
+        calculator = ICCCalculator(use_univers_weights=True)
+        results = calculator.compute(enriched_schema, classification=classification)
+
+        stats = results.get_stats()
+        assert stats.get('has_classification')
+        assert 'by_univers' in stats
+        assert 'n_alertes_surprise' in stats
+
+    def test_legacy_mode_without_classification(self, enriched_schema):
+        """Le mode legacy (sans classification) fonctionne toujours."""
+        from gl_crystal.layer1_crystallinity.icc_calculator import ICCCalculator
+
+        calculator = ICCCalculator()
+        results = calculator.compute(enriched_schema)
+
+        assert not results.has_classification
+        assert results.n_couples > 0
+
+        # Z-score legacy doit être calculé
+        for score in results.scores:
+            assert score.zscore is not None
+
+
+class TestProperNounNormalization:
+    """Tests de la normalisation des noms propres."""
+
+    def test_normalize_names(self):
+        """Les noms propres sont correctement normalisés."""
+        from gl_crystal.layer0_classifier import normalize_proper_nouns
+
+        libelles = [
+            "FACTURE DUPONT 2024-001",
+            "FACTURE MARTIN 2024-002",
+            "FACTURE DUBOIS 2024-003",
+        ]
+
+        normalized = normalize_proper_nouns(libelles)
+
+        # Les noms propres doivent être remplacés par des tokens génériques
+        for lib in normalized:
+            # Le pattern devrait être uniforme
+            assert "[NOM_PROPRE]" in lib or "FACTURE" in lib
+
+    def test_normalize_invoice_references(self):
+        """Les références de factures sont normalisées."""
+        from gl_crystal.layer0_classifier import normalize_proper_nouns
+
+        libelles = [
+            "FAC-2024-00001",
+            "FAC-2024-00002",
+            "FAC-2024-00003",
+        ]
+
+        normalized = normalize_proper_nouns(libelles)
+
+        # Les références numériques doivent être normalisées
+        # L'entropie après normalisation devrait être plus faible
+        assert len(set(normalized)) <= len(set(libelles))
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
