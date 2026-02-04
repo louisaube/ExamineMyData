@@ -91,18 +91,111 @@ OPTIONAL_COLUMNS = ['journal_code', 'journal_libelle', 'compte_libelle',
                     'auxiliaire', 'analytique', 'libelle', 'piece']
 
 
+@dataclass
+class MappingPreview:
+    """
+    Preview du mapping détecté pour validation utilisateur.
+
+    L'utilisateur DOIT valider:
+    - La colonne de compte comptable (obligatoire)
+    - La colonne d'analytique (obligatoire pour l'analyse multi-sites)
+
+    Note métier: l'analytique ne concerne que les comptes P&L (classes 6/7).
+    Les comptes de bilan (classes 1-5) n'ont pas d'analytique.
+    """
+    detected_format: str
+    mapping: ColumnMapping
+    columns_available: List[str]
+    sample_data: Dict[str, List[str]]  # {colonne: [5 premières valeurs]}
+    validation_required: List[str]  # Colonnes à valider par l'utilisateur
+    warnings: List[str]
+
+
 class GLLoader:
     """
     Chargeur de GL multi-format.
 
     Détecte automatiquement le format et normalise vers le schéma canonique.
+
+    Usage recommandé (avec validation utilisateur):
+        loader = GLLoader()
+        preview = loader.preview(file_path)
+        # Afficher preview à l'utilisateur, obtenir validation/corrections
+        schema = loader.load(file_path, manual_mapping=validated_mapping)
     """
 
-    def __init__(self):
+    def __init__(self, analytique_pnl_only: bool = True):
+        """
+        Args:
+            analytique_pnl_only: Si True, l'analytique n'est appliqué qu'aux
+                                 comptes P&L (classes 6/7). Les comptes de bilan
+                                 (classes 1-5) auront analytique=None.
+                                 C'est le comportement comptable standard.
+        """
         self.detected_format: Optional[str] = None
         self.column_mapping: Optional[ColumnMapping] = None
         self.warnings: List[str] = []
         self.errors: List[str] = []
+        self.analytique_pnl_only = analytique_pnl_only
+        self._df: Optional[pd.DataFrame] = None  # Cache pour preview + load
+
+    def preview(self, file_path: str, sheet_name: Optional[str] = None) -> MappingPreview:
+        """
+        Analyse le fichier et retourne un preview du mapping pour validation.
+
+        L'utilisateur DOIT valider:
+        - compte_general: la colonne contenant le numéro de compte
+        - analytique: la colonne contenant le code établissement/site
+
+        Args:
+            file_path: Chemin vers le fichier
+            sheet_name: Nom de la feuille Excel (optionnel)
+
+        Returns:
+            MappingPreview avec le mapping proposé et les données échantillon
+        """
+        self.warnings = []
+        self.errors = []
+
+        # Lecture du fichier
+        self._df = self._read_file(file_path, sheet_name)
+        if self._df is None or self._df.empty:
+            raise ValueError(f"Impossible de lire le fichier: {file_path}")
+
+        # Détection du format
+        self.detected_format, self.column_mapping = self._detect_format(self._df)
+
+        # Extraction analytique composite si détecté
+        self._df = self._extract_analytique_composite(self._df)
+
+        # Échantillon de données (5 premières valeurs non-nulles par colonne)
+        sample_data = {}
+        for col in self._df.columns:
+            values = self._df[col].dropna().head(5).astype(str).tolist()
+            sample_data[col] = values
+
+        # Colonnes à valider obligatoirement
+        validation_required = ['compte_general', 'analytique']
+
+        # Warnings spécifiques
+        if not self.column_mapping.analytique:
+            self.warnings.append(
+                "⚠️ Colonne analytique non détectée. "
+                "Sans analytique, l'analyse multi-établissements n'est pas possible."
+            )
+        if not self.column_mapping.compte_general:
+            self.warnings.append(
+                "⚠️ Colonne de compte non détectée. Cette colonne est OBLIGATOIRE."
+            )
+
+        return MappingPreview(
+            detected_format=self.detected_format or 'unknown',
+            mapping=self.column_mapping,
+            columns_available=list(self._df.columns),
+            sample_data=sample_data,
+            validation_required=validation_required,
+            warnings=self.warnings.copy(),
+        )
 
     def load(self, file_path: str, sheet_name: Optional[str] = None,
              manual_mapping: Optional[Dict[str, str]] = None) -> GLSchema:
@@ -112,18 +205,26 @@ class GLLoader:
         Args:
             file_path: Chemin vers le fichier (Excel ou CSV)
             sheet_name: Nom de la feuille Excel (optionnel)
-            manual_mapping: Mapping manuel des colonnes (optionnel)
+            manual_mapping: Mapping manuel des colonnes validé par l'utilisateur
+                           Clés attendues: 'compte_general', 'analytique', 'date', etc.
 
         Returns:
             GLSchema normalisé et validé
-        """
-        self.warnings = []
-        self.errors = []
 
-        # Lecture du fichier
-        df = self._read_file(file_path, sheet_name)
-        if df is None or df.empty:
-            raise ValueError(f"Impossible de lire le fichier: {file_path}")
+        Note:
+            Pour un usage production, appeler preview() d'abord pour obtenir
+            le mapping détecté, le faire valider par l'utilisateur, puis
+            passer le mapping validé ici.
+        """
+        # Réutilise le DataFrame si preview() a déjà été appelé
+        if self._df is not None and not manual_mapping:
+            df = self._df
+        else:
+            self.warnings = []
+            self.errors = []
+            df = self._read_file(file_path, sheet_name)
+            if df is None or df.empty:
+                raise ValueError(f"Impossible de lire le fichier: {file_path}")
 
         # Détection du format et mapping
         if manual_mapping:
@@ -397,15 +498,32 @@ class GLLoader:
                 if debit == 0 and credit == 0:
                     continue
 
+                # Compte général
+                compte = str(row[m.compte_general]).strip()
+
+                # Analytique : uniquement sur comptes P&L (classes 6/7) si flag activé
+                analytique_val = None
+                if m.analytique and pd.notna(row.get(m.analytique)):
+                    raw_analytique = str(row.get(m.analytique))
+                    if raw_analytique.strip():
+                        if self.analytique_pnl_only:
+                            # N'applique l'analytique que sur les comptes P&L
+                            if compte and compte[0] in ('6', '7'):
+                                analytique_val = raw_analytique.strip()
+                            # Comptes de bilan (1-5) : pas d'analytique
+                        else:
+                            # Mode permissif : analytique sur tous les comptes
+                            analytique_val = raw_analytique.strip()
+
                 entry = GLEntry(
                     date_ecriture=date_val,
                     piece=str(row.get(m.piece, '')) if m.piece and pd.notna(row.get(m.piece)) else f"L{idx}",
                     journal_code=str(row.get(m.journal_code, '')) if m.journal_code and pd.notna(row.get(m.journal_code)) else '',
                     journal_libelle=str(row.get(m.journal_libelle, '')) if m.journal_libelle and pd.notna(row.get(m.journal_libelle)) else '',
-                    compte_general=str(row[m.compte_general]).strip(),
+                    compte_general=compte,
                     compte_libelle=str(row.get(m.compte_libelle, '')) if m.compte_libelle and pd.notna(row.get(m.compte_libelle)) else '',
                     compte_auxiliaire=str(row.get(m.compte_auxiliaire, '')) if m.compte_auxiliaire and pd.notna(row.get(m.compte_auxiliaire)) else None,
-                    analytique=str(row.get(m.analytique, '')) if m.analytique and pd.notna(row.get(m.analytique)) else None,
+                    analytique=analytique_val,
                     libelle_ecriture=str(row.get(m.libelle_ecriture, '')) if m.libelle_ecriture and pd.notna(row.get(m.libelle_ecriture)) else '',
                     debit=debit,
                     credit=credit,
