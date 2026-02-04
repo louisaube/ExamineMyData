@@ -1,11 +1,11 @@
 # Sprint Plan: GL Normalizer
 
-**Date:** 2026-02-03
+**Date:** 2026-02-03 (Updated: 2026-02-03)
 **Project:** ExamineMyData (GL Normalizer)
 **Level:** 2 (Medium feature set)
-**Total Stories:** 22
-**Total Points:** 78
-**Planned Sprints:** 3
+**Total Stories:** 33 (original 22 + 8 enhancement + 3 new UX)
+**Total Points:** 110
+**Planned Sprints:** 7
 **Target Completion:** Q1 2026
 
 ---
@@ -721,6 +721,7 @@ Afin de détecter des patterns de fraude.
 | EPIC-004: Run Rate | STORY-015, 016 | 8 | 2 |
 | EPIC-005: Rapport | STORY-017, 018 | 8 | 2-3 |
 | EPIC-006: IA | STORY-019, 020, 021 | 13 | 3 |
+| EPIC-007: UX Enhancement | STORY-031, 032, 033 | 18 | 7 |
 
 ---
 
@@ -748,6 +749,146 @@ Afin de détecter des patterns de fraude.
 | FR-018 | STORY-021 | 3 |
 
 **Coverage:** 18/18 FRs (100%)
+
+---
+
+### Sprint 7 (Semaines 13-14) - 18 points
+
+**Goal:** Implémenter les nouveaux écrans UX (Column Mapping + Qualification) avec accessibilité WCAG AAA
+
+| Story | Description | Points | Priority |
+|-------|-------------|--------|----------|
+| STORY-031 | Column Mapping Web UI | 5 | Must |
+| STORY-032 | Qualification Web UI | 8 | Must |
+| STORY-033 | WCAG AAA Accessibility | 5 | Should |
+
+**Total:** 18 points / 35 capacity (51%)
+
+**Deliverables Sprint 7:**
+- Page Column Mapping avec preview données
+- Page Qualification avec workflow 10 questions
+- Conformité WCAG 2.1 AAA sur toutes les pages
+- Routes API pour mapping et qualification
+
+**Dependencies:**
+- UX Design document (completed)
+- Architecture validation (completed)
+
+**Risks:**
+- Complexité du workflow qualification → mitigation: suivre wireframes UX
+
+---
+
+## New Stories (Sprint 7)
+
+### STORY-031: Column Mapping Web UI
+
+**Epic:** EPIC-007 UX Enhancement
+**Priority:** Must Have
+**Points:** 5
+**FR:** FR-003 (Web UI)
+**UX Ref:** ux-design-gl-normalizer-2026-02-03.md - Screen 2
+
+**User Story:**
+En tant que DAF avec un format GL non reconnu,
+Je veux mapper manuellement les colonnes via l'interface web,
+Afin de pouvoir analyser mon fichier sans utiliser la CLI.
+
+**Acceptance Criteria:**
+- [ ] Route `/mapping/<job_id>` accessible après détection format échouée
+- [ ] Affichage des colonnes détectées dans le fichier
+- [ ] 5 dropdowns pour mapper: Compte, Date, Montant, Libellé, Journal
+- [ ] Preview des 5 premières lignes avec colonnes mappées
+- [ ] Validation des colonnes obligatoires (Compte, Date, Montant, Libellé)
+- [ ] Option "Sauvegarder ce mapping" pour réutilisation
+- [ ] Boutons Annuler (retour upload) et Valider (continue analyse)
+- [ ] Messages d'erreur clairs en français
+- [ ] Accessible au clavier (Tab navigation)
+
+**Technical Notes:**
+- Template: `templates/mapping.html`
+- Route: `GET/POST /mapping/<job_id>`
+- API: `GET /api/preview/<job_id>` pour données preview
+- API: `POST /api/mapping/<job_id>` pour soumettre mapping
+- Utilise `Loader.map_columns()` existant
+- Stockage mapping en session ou fichier temp
+
+**Dependencies:** Loader component (exists), UX Design
+
+---
+
+### STORY-032: Qualification Web UI
+
+**Epic:** EPIC-007 UX Enhancement
+**Priority:** Must Have
+**Points:** 8
+**FR:** FR-009, FR-010, FR-011 (Web UI)
+**UX Ref:** ux-design-gl-normalizer-2026-02-03.md - Screen 5
+
+**User Story:**
+En tant que DAF,
+Je veux qualifier les anomalies détectées via l'interface web,
+Afin de documenter mes décisions et obtenir un run rate dépollué.
+
+**Acceptance Criteria:**
+- [ ] Route `/qualify/<job_id>` accessible depuis page Results
+- [ ] Affichage des top 10 anomalies par impact
+- [ ] Pour chaque anomalie:
+  - Type, sévérité, montant impacté, mois concerné
+  - Contexte PCG (compte, classe, comportement attendu)
+  - 3 options: Justifié / Non justifié / À investiguer
+  - Champ commentaire optionnel
+- [ ] Navigation: Passer / Précédent / Suivant (Terminer sur dernière)
+- [ ] Progress indicator (1/10, 2/10, etc.)
+- [ ] Sauvegarde automatique des réponses
+- [ ] Bouton "Terminer" recalcule run rate et redirige vers Results
+- [ ] Accessible au clavier (Tab, Enter, flèches pour radio)
+
+**Technical Notes:**
+- Template: `templates/qualification.html`
+- Route: `GET /qualify/<job_id>`
+- API: `GET /api/qualifications/<job_id>` - liste anomalies
+- API: `POST /api/qualifications/<job_id>` - soumettre réponses
+- Utilise `Qualifier` component existant
+- Stockage en YAML (justifications.yaml)
+
+**Dependencies:** Qualifier component (exists), Detector (exists), UX Design
+
+---
+
+### STORY-033: WCAG AAA Accessibility Updates
+
+**Epic:** EPIC-007 UX Enhancement
+**Priority:** Should Have
+**Points:** 5
+**NFR:** Accessibility WCAG 2.1 Level AAA
+**UX Ref:** ux-design-gl-normalizer-2026-02-03.md - Section 3
+
+**User Story:**
+En tant qu'utilisateur avec handicap visuel ou moteur,
+Je veux que l'application soit conforme WCAG AAA,
+Afin de pouvoir utiliser toutes les fonctionnalités.
+
+**Acceptance Criteria:**
+- [ ] Ratio de contraste 7:1 pour texte normal, 4.5:1 pour grand texte
+- [ ] Skip link "Aller au contenu principal" sur toutes les pages
+- [ ] Focus visible (3px outline) sur tous éléments interactifs
+- [ ] Navigation complète au clavier sans piège
+- [ ] `aria-label` sur tous boutons icône
+- [ ] `aria-live="polite"` pour mises à jour dynamiques
+- [ ] Landmarks HTML5: `<header>`, `<nav>`, `<main>`, `<footer>`
+- [ ] Hiérarchie headings (H1 unique, H2 sections, H3 sous-sections)
+- [ ] Labels associés à tous les inputs (`for`/`id`)
+- [ ] Messages d'erreur avec `aria-invalid` et `aria-describedby`
+- [ ] `lang="fr"` sur `<html>`
+
+**Technical Notes:**
+- Mettre à jour `static/style.css`
+- Mettre à jour tous templates existants
+- Tester avec extension Axe DevTools
+- Tester navigation clavier manuelle
+
+**Dependencies:** All existing templates
 
 ---
 
@@ -790,20 +931,37 @@ Pour qu'une story soit considérée complète :
 
 ## Next Steps
 
-**Immédiat:** Commencer Sprint 1
+**Current:** Sprint 7 - UX Enhancement
 
-**Première story:** `STORY-000` (Setup projet)
+**Stories à implémenter:**
+1. `STORY-031` - Column Mapping Web UI (5 points)
+2. `STORY-032` - Qualification Web UI (8 points)
+3. `STORY-033` - WCAG AAA Accessibility (5 points)
 
 ```bash
 # Pour commencer l'implémentation:
-/dev-story STORY-000
+/dev-story STORY-031
 ```
 
 **Sprint cadence:**
 - Sprint length: 2 semaines
-- Sprint review: Fin de semaine 2
-- MVP attendu: Fin Sprint 2 (semaine 4)
+- Sprint 7 goal: Nouveaux écrans UX + Accessibilité AAA
+
+---
+
+## Sprint History
+
+| Sprint | Status | Goal | Points |
+|--------|--------|------|--------|
+| Sprint 1 | Completed | Fondations + Import + Détection base | 32 |
+| Sprint 2 | Completed | MVP (Qualification + Run Rate + Rapport) | 32 |
+| Sprint 3 | Completed | Module IA optionnel | 16 |
+| Sprint 4 | Completed | Sécurité tokens | 6 |
+| Sprint 5 | Completed | Algorithmes avancés | 16 |
+| Sprint 6 | Completed | UX + Performance | 18 |
+| Sprint 7 | **Current** | UX Screens (Mapping + Qualification) | 18 |
 
 ---
 
 *Document généré par BMAD Method v6 - Phase 4 Implementation Planning*
+*Dernière mise à jour: 2026-02-03*

@@ -3,30 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="GL Normalizer - Outil d'analyse et de normalisation du Grand Livre comptable">
     <title>{% block title %}GL Normalizer{% endblock %}</title>
     <link rel="stylesheet" href="/static/style.css">
+    <!-- Prefers reduced motion -->
+    <style>
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
 </head>
 <body>
-    <header>
+    <!-- Skip to main content link (WCAG 2.4.1) -->
+    <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+    <header role="banner">
         <div class="container header-content">
             <div class="header-title">
-                <h1><a href="/">GL Normalizer</a></h1>
+                <h1><a href="/" aria-label="GL Normalizer - Retour à l'accueil">GL Normalizer</a></h1>
                 <p class="tagline">Analyse et normalisation du P&L</p>
             </div>
-            <nav class="header-nav">
-                <a href="/settings" class="nav-link">Configuration</a>
+            <nav class="header-nav" role="navigation" aria-label="Navigation principale">
+                <a href="/settings" class="nav-link" aria-label="Configuration des paramètres">Configuration</a>
             </nav>
         </div>
     </header>
-    
-    <main class="container">
+
+    <main id="main-content" class="container" role="main" tabindex="-1">
         {% block content %}{% endblock %}
     </main>
-    
-    <footer>
+
+    <footer role="contentinfo">
         <div class="container">
             <p>GL Normalizer v{{ version if version else "2.6.0" }}</p>
         </div>
     </footer>
+
+    <!-- Screen reader announcements (WCAG) -->
+    <div id="sr-announcements" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
+    {% block scripts %}{% endblock %}
 </body>
 </html>

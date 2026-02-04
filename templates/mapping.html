@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Mapping des colonnes - GL Normalizer{% endblock %}
+
+{% block content %}
+<section class="upload-section">
+    <h2>Mapping des colonnes</h2>
+
+    <div class="alert alert-warning" role="alert">
+        <strong>Format non reconnu</strong>
+        <p>Le format de votre fichier n'a pas pu etre detecte automatiquement. Veuillez indiquer les colonnes correspondantes.</p>
+    </div>
+
+    <div class="mapping-info">
+        <p><strong>Fichier :</strong> {{ filename }}</p>
+        <p><strong>Colonnes detectees :</strong> {{ columns|join(', ') }}</p>
+    </div>
+
+    <form id="mapping-form" method="post" action="/mapping/{{ job_id }}">
+        <div class="mapping-grid">
+            <div class="form-group">
+                <label for="compte_column">Compte <span class="required" aria-hidden="true">*</span></label>
+                <select id="compte_column" name="compte_column" required aria-required="true">
+                    <option value="">-- Selectionnez --</option>
+                    {% for col in columns %}
+                    <option value="{{ col }}" {% if col.lower() in ['compte', 'account', 'num_compte', 'numero_compte', 'cpt'] %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+                <small>Numero de compte comptable (ex: 601000)</small>
+            </div>
+
+            <div class="form-group">
+                <label for="date_column">Date <span class="required" aria-hidden="true">*</span></label>
+                <select id="date_column" name="date_column" required aria-required="true">
+                    <option value="">-- Selectionnez --</option>
+                    {% for col in columns %}
+                    <option value="{{ col }}" {% if col.lower() in ['date', 'date_ecriture', 'dateecr', 'dt'] %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+                <small>Date de l'ecriture comptable</small>
+            </div>
+
+            <div class="form-group">
+                <label for="montant_column">Montant <span class="required" aria-hidden="true">*</span></label>
+                <select id="montant_column" name="montant_column" required aria-required="true">
+                    <option value="">-- Selectionnez --</option>
+                    {% for col in columns %}
+                    <option value="{{ col }}" {% if col.lower() in ['montant', 'amount', 'mnt', 'solde'] %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+                <small>Montant de l'ecriture (signe)</small>
+            </div>
+
+            <div class="form-group">
+                <label for="libelle_column">Libelle <span class="required" aria-hidden="true">*</span></label>
+                <select id="libelle_column" name="libelle_column" required aria-required="true">
+                    <option value="">-- Selectionnez --</option>
+                    {% for col in columns %}
+                    <option value="{{ col }}" {% if col.lower() in ['libelle', 'label', 'description', 'lib', 'intitule'] %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+                <small>Libelle de l'ecriture</small>
+            </div>
+
+            <div class="form-group">
+                <label for="journal_column">Journal</label>
+                <select id="journal_column" name="journal_column">
+                    <option value="">-- Optionnel --</option>
+                    {% for col in columns %}
+                    <option value="{{ col }}" {% if col.lower() in ['journal', 'jnl', 'code_journal'] %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+                <small>Code journal (optionnel)</small>
+            </div>
+        </div>
+
+        <div class="preview-section" id="preview-section">
+            <h3>Apercu des donnees</h3>
+            <p class="preview-info">Les 5 premieres lignes avec vos colonnes selectionnees :</p>
+            <div class="table-wrapper">
+                <table class="data-table preview-table" id="preview-table" aria-label="Apercu des donnees mappees">
+                    <thead>
+                        <tr>
+                            <th scope="col">Compte</th>
+                            <th scope="col">Date</th>
+                            <th scope="col">Montant</th>
+                            <th scope="col">Libelle</th>
+                            <th scope="col">Journal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="preview-body">
+                        {% if preview_data %}
+                        {% for row in preview_data %}
+                        <tr>
+                            <td>{{ row.compte if row.compte else '-' }}</td>
+                            <td>{{ row.date if row.date else '-' }}</td>
+                            <td>{{ row.montant if row.montant else '-' }}</td>
+                            <td>{{ row.libelle if row.libelle else '-' }}</td>
+                            <td>{{ row.journal if row.journal else '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="preview-empty">Selectionnez les colonnes pour voir l'apercu</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="form-group checkbox-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="save_mapping" name="save_mapping" value="1">
+                Sauvegarder ce mapping pour une utilisation future
+            </label>
+        </div>
+
+        <input type="hidden" name="year" value="{{ year }}">
+
+        <div id="error-message" class="alert alert-error" style="display: none;" role="alert" aria-live="polite">
+        </div>
+
+        <div class="form-actions">
+            <a href="/" class="btn btn-outline">Annuler</a>
+            <button type="submit" class="btn btn-primary" id="submit-btn">Valider et analyser</button>
+        </div>
+    </form>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('mapping-form');
+    const selects = form.querySelectorAll('select');
+    const previewBody = document.getElementById('preview-body');
+    const errorDiv = document.getElementById('error-message');
+    const submitBtn = document.getElementById('submit-btn');
+
+    // Mettre a jour l'apercu quand les selects changent
+    selects.forEach(select => {
+        select.addEventListener('change', updatePreview);
+    });
+
+    function updatePreview() {
+        const compteCol = document.getElementById('compte_column').value;
+        const dateCol = document.getElementById('date_column').value;
+        const montantCol = document.getElementById('montant_column').value;
+        const libelleCol = document.getElementById('libelle_column').value;
+        const journalCol = document.getElementById('journal_column').value;
+
+        if (!compteCol || !dateCol || !montantCol || !libelleCol) {
+            return;
+        }
+
+        // Appeler l'API pour obtenir l'apercu
+        fetch('/api/preview/{{ job_id }}?' + new URLSearchParams({
+            compte: compteCol,
+            date: dateCol,
+            montant: montantCol,
+            libelle: libelleCol,
+            journal: journalCol || ''
+        }))
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.preview) {
+                let html = '';
+                data.preview.forEach(row => {
+                    html += '<tr>';
+                    html += '<td>' + (row.compte || '-') + '</td>';
+                    html += '<td>' + (row.date || '-') + '</td>';
+                    html += '<td>' + (row.montant || '-') + '</td>';
+                    html += '<td>' + (row.libelle || '-') + '</td>';
+                    html += '<td>' + (row.journal || '-') + '</td>';
+                    html += '</tr>';
+                });
+                previewBody.innerHTML = html;
+            }
+        })
+        .catch(err => {
+            console.error('Erreur apercu:', err);
+        });
+    }
+
+    // Validation du formulaire
+    form.addEventListener('submit', function(e) {
+        const compteCol = document.getElementById('compte_column').value;
+        const dateCol = document.getElementById('date_column').value;
+        const montantCol = document.getElementById('montant_column').value;
+        const libelleCol = document.getElementById('libelle_column').value;
+
+        // Verifier que les colonnes obligatoires sont selectionnees
+        if (!compteCol || !dateCol || !montantCol || !libelleCol) {
+            e.preventDefault();
+            showError('Veuillez selectionner toutes les colonnes obligatoires (Compte, Date, Montant, Libelle)');
+            return;
+        }
+
+        // Verifier que les colonnes sont differentes
+        const selected = [compteCol, dateCol, montantCol, libelleCol].filter(Boolean);
+        const unique = new Set(selected);
+        if (selected.length !== unique.size) {
+            e.preventDefault();
+            showError('Chaque colonne doit etre differente');
+            return;
+        }
+
+        // Desactiver le bouton pendant la soumission
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Validation en cours...';
+    });
+
+    function showError(message) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        errorDiv.focus();
+    }
+
+    // Charger l'apercu initial
+    updatePreview();
+});
+</script>
+{% endblock %}

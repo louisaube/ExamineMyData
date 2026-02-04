@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Qualification des anomalies - GL Normalizer{% endblock %}
+
+{% block content %}
+<section class="qualification-section" role="main" aria-label="Qualification des anomalies">
+    <header class="qualification-header">
+        <h2 id="page-title">Qualification des anomalies</h2>
+        <span class="qualification-progress" aria-live="polite">
+            Anomalie <span id="current-index">{{ current_index }}</span>/<span id="total-count">{{ total_count }}</span>
+        </span>
+    </header>
+
+    {% if anomalies and anomalies|length > 0 %}
+    <form id="qualification-form" method="post" action="/qualification/{{ job_id }}/save">
+        <input type="hidden" name="anomaly_index" id="anomaly-index" value="{{ current_index - 1 }}">
+
+        <article class="anomaly-card" role="article" aria-labelledby="anomaly-title">
+            <header class="anomaly-card-header">
+                <h3 id="anomaly-title">
+                    ANOMALIE #{{ current_index }} - Compte {{ current_anomaly.compte }}
+                </h3>
+            </header>
+
+            <div class="anomaly-details">
+                <dl class="anomaly-info-grid">
+                    <div class="info-item">
+                        <dt>Type</dt>
+                        <dd>{{ current_anomaly.anomaly_type or 'Non spécifié' }}</dd>
+                    </div>
+                    <div class="info-item">
+                        <dt>Sévérité</dt>
+                        <dd>
+                            <span class="severity-badge severity-{{ current_anomaly.severity|lower if current_anomaly.severity else 'medium' }}"
+                                  aria-label="Sévérité {{ current_anomaly.severity or 'moyenne' }}">
+                                {{ current_anomaly.severity or 'Medium' }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="info-item">
+                        <dt>Montant impacté</dt>
+                        <dd>{{ "{:,.0f}".format(current_anomaly.montant|default(0)) }} €</dd>
+                    </div>
+                    {% if current_anomaly.details %}
+                    <div class="info-item info-full">
+                        <dt>Détails</dt>
+                        <dd>{{ current_anomaly.details }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            {% if current_anomaly.pcg_context %}
+            <aside class="pcg-context-box" role="complementary" aria-label="Contexte PCG">
+                <h4>Contexte PCG</h4>
+                <p>{{ current_anomaly.pcg_context }}</p>
+                {% if current_anomaly.is_expected %}
+                <p class="expected-note">
+                    <strong>Comportement attendu :</strong> Ce type de variation est normal pour ce compte.
+                </p>
+                {% endif %}
+            </aside>
+            {% endif %}
+
+            <fieldset class="qualification-options" aria-describedby="qualification-help">
+                <legend id="qualification-help">Cette anomalie est-elle justifiée ?</legend>
+
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio"
+                               id="justified"
+                               name="qualification"
+                               value="justified"
+                               {% if saved_qualifications and saved_qualifications[current_index - 1] == 'justified' %}checked{% endif %}>
+                        <label for="justified">
+                            <strong>Justifié</strong>
+                            <span class="radio-description">L'anomalie a une explication métier valide</span>
+                        </label>
+                    </div>
+
+                    <div class="radio-option">
+                        <input type="radio"
+                               id="not-justified"
+                               name="qualification"
+                               value="not_justified"
+                               {% if saved_qualifications and saved_qualifications[current_index - 1] == 'not_justified' %}checked{% endif %}>
+                        <label for="not-justified">
+                            <strong>Non justifié</strong>
+                            <span class="radio-description">L'anomalie nécessite une correction ou investigation</span>
+                        </label>
+                    </div>
+
+                    <div class="radio-option">
+                        <input type="radio"
+                               id="investigate"
+                               name="qualification"
+                               value="investigate"
+                               {% if saved_qualifications and saved_qualifications[current_index - 1] == 'investigate' %}checked{% endif %}>
+                        <label for="investigate">
+                            <strong>À investiguer</strong>
+                            <span class="radio-description">Besoin d'informations supplémentaires</span>
+                        </label>
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="comment-section">
+                <label for="comment">Commentaire <span class="optional">(optionnel)</span></label>
+                <textarea id="comment"
+                          name="comment"
+                          rows="3"
+                          placeholder="Ajoutez un commentaire pour expliquer votre qualification..."
+                          aria-describedby="comment-help">{{ saved_comments[current_index - 1] if saved_comments and saved_comments[current_index - 1] else '' }}</textarea>
+                <small id="comment-help">Ce commentaire sera inclus dans le rapport final.</small>
+            </div>
+        </article>
+
+        <!-- Progress dots -->
+        <nav class="progress-dots" aria-label="Navigation anomalies">
+            {% for i in range(total_count) %}
+            <span class="progress-dot {% if i < current_index - 1 %}completed{% elif i == current_index - 1 %}current{% endif %}"
+                  aria-label="Anomalie {{ i + 1 }}{% if i < current_index - 1 %} (qualifiée){% elif i == current_index - 1 %} (en cours){% endif %}">
+            </span>
+            {% endfor %}
+        </nav>
+
+        <!-- Navigation buttons -->
+        <div class="qualification-actions">
+            <button type="button"
+                    class="btn btn-outline"
+                    onclick="skipAnomaly()"
+                    aria-label="Passer cette anomalie">
+                Passer
+            </button>
+
+            <div class="nav-buttons">
+                {% if current_index > 1 %}
+                <a href="/qualification/{{ job_id }}?index={{ current_index - 2 }}"
+                   class="btn btn-outline"
+                   aria-label="Anomalie précédente">
+                    ← Précédent
+                </a>
+                {% endif %}
+
+                {% if current_index < total_count %}
+                <button type="submit"
+                        class="btn btn-primary"
+                        name="action"
+                        value="next"
+                        aria-label="Enregistrer et passer à l'anomalie suivante">
+                    Suivant →
+                </button>
+                {% else %}
+                <button type="submit"
+                        class="btn btn-secondary"
+                        name="action"
+                        value="finish"
+                        aria-label="Terminer la qualification">
+                    Terminer ✓
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    {% else %}
+    <div class="no-anomalies" role="alert">
+        <p>Aucune anomalie à qualifier pour cette analyse.</p>
+        <a href="/results/{{ job_id }}" class="btn btn-primary">Retour aux résultats</a>
+    </div>
+    {% endif %}
+</section>
+
+<script>
+// Auto-save comment on blur
+document.getElementById('comment').addEventListener('blur', function() {
+    // Save comment via AJAX (optional enhancement)
+    const comment = this.value;
+    const index = document.getElementById('anomaly-index').value;
+
+    if (comment.trim()) {
+        fetch('/api/qualification/{{ job_id }}/comment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ index: parseInt(index), comment: comment })
+        }).catch(err => console.log('Auto-save failed:', err));
+    }
+});
+
+// Skip anomaly without qualification
+function skipAnomaly() {
+    const currentIndex = {{ current_index }};
+    const totalCount = {{ total_count }};
+
+    if (currentIndex < totalCount) {
+        window.location.href = '/qualification/{{ job_id }}?index=' + currentIndex;
+    } else {
+        // Last anomaly - go back to results
+        window.location.href = '/results/{{ job_id }}';
+    }
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', function(e) {
+    // Arrow left = previous
+    if (e.key === 'ArrowLeft' && e.altKey) {
+        const prevLink = document.querySelector('a[aria-label="Anomalie précédente"]');
+        if (prevLink) prevLink.click();
+    }
+    // Arrow right = next/submit
+    if (e.key === 'ArrowRight' && e.altKey) {
+        const nextBtn = document.querySelector('button[name="action"]');
+        if (nextBtn) nextBtn.click();
+    }
+});
+</script>
+{% endblock %}

@@ -389,8 +389,13 @@
     <!-- Anomalies détaillées -->
     {% if anomalies %}
     <div class="anomalies-section">
-        <h3>Anomalies détectées ({{ anomalies|length }})</h3>
-        <table class="data-table">
+        <div class="anomalies-header">
+            <h3>Anomalies détectées ({{ anomalies|length }})</h3>
+            <a href="/qualification/{{ job_id }}" class="btn btn-primary" aria-label="Qualifier les {{ anomalies|length }} anomalies détectées">
+                Qualifier les anomalies
+            </a>
+        </div>
+        <table class="data-table" aria-label="Liste des anomalies détectées">
             <thead>
                 <tr>
                     <th>Compte</th>
@@ -503,6 +508,105 @@
                 {% endif %}
             </div>
             {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- GL Crystal - Analyse topologique v2.0 -->
+    {% if crystal_analysis %}
+    <div class="crystal-section">
+        <h3>
+            <span class="crystal-icon">💎</span>
+            Analyse Topologique Crystal
+            <span class="badge badge-info">v2.0</span>
+        </h3>
+        <p class="section-intro">
+            Analyse de la cristallinité comptable : régularité des patterns dans le Grand Livre.
+        </p>
+
+        <!-- Métriques Crystal -->
+        <div class="crystal-metrics">
+            <div class="crystal-metric">
+                <span class="metric-value">{{ crystal_analysis.n_couples }}</span>
+                <span class="metric-label">Couples analysés</span>
+            </div>
+            <div class="crystal-metric metric-success">
+                <span class="metric-value">{{ crystal_analysis.n_cristallins }}</span>
+                <span class="metric-label">Cristallins</span>
+                <small>ICC ≥ 0.7</small>
+            </div>
+            <div class="crystal-metric metric-warning">
+                <span class="metric-value">{{ crystal_analysis.n_amorphes }}</span>
+                <span class="metric-label">Amorphes</span>
+                <small>ICC &lt; 0.4</small>
+            </div>
+            <div class="crystal-metric {% if crystal_analysis.n_alertes_surprise > 0 %}metric-danger{% else %}metric-success{% endif %}">
+                <span class="metric-value">{{ crystal_analysis.n_alertes_surprise }}</span>
+                <span class="metric-label">Alertes surprise</span>
+                <small>Comportement inattendu</small>
+            </div>
+        </div>
+
+        <!-- Répartition par univers sémantique -->
+        {% if crystal_analysis.univers_distribution %}
+        <div class="univers-distribution">
+            <h4>Répartition par univers sémantique</h4>
+            <div class="univers-bars">
+                {% for univers, data in crystal_analysis.univers_distribution.items() %}
+                <div class="univers-bar">
+                    <span class="univers-name univers-{{ univers|lower }}">{{ univers }}</span>
+                    <div class="bar-container">
+                        <div class="bar-fill" style="width: {{ data.pct }}%"></div>
+                    </div>
+                    <span class="univers-count">{{ data.count }} ({{ "%.1f"|format(data.pct) }}%)</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Top alertes (surprises) -->
+        {% if crystal_analysis.top_surprises %}
+        <div class="crystal-alerts">
+            <h4>Top couples surprenants</h4>
+            <p class="alert-explanation">
+                Couples dont le comportement dévie de l'attendu pour leur univers sémantique.
+            </p>
+            <table class="data-table crystal-table">
+                <thead>
+                    <tr>
+                        <th>Compte</th>
+                        <th>Analytique</th>
+                        <th>Univers</th>
+                        <th>ICC</th>
+                        <th>Surprise</th>
+                        <th>Type</th>
+                        <th>Écritures</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in crystal_analysis.top_surprises %}
+                    <tr class="crystal-{{ alert.classification }}">
+                        <td><strong>{{ alert.compte }}</strong></td>
+                        <td>{{ alert.analytique }}</td>
+                        <td>
+                            <span class="univers-badge univers-{{ alert.univers|lower }}">
+                                {{ alert.univers }}
+                            </span>
+                        </td>
+                        <td class="icc-value">{{ "%.2f"|format(alert.icc) }}</td>
+                        <td class="surprise-value">{{ "%.2f"|format(alert.surprise) }}</td>
+                        <td>
+                            <span class="crystal-badge crystal-{{ alert.classification }}">
+                                {{ alert.classification|capitalize }}
+                            </span>
+                        </td>
+                        <td>{{ alert.n_ecritures }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         {% endif %}
     </div>
@@ -1355,24 +1459,37 @@ tr.severity-high { background: #ffe5d0; }
 
 <script>
 function executeDrilldown(questionId, jobId) {
-    // Appel API pour exécuter l'analyse drill-down
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'En cours...';
+    
     fetch(`/api/drilldown/${jobId}/${questionId}`, {
         method: 'POST'
     })
     .then(response => response.json())
     .then(data => {
-        if (data.success) {
-            // Afficher le résultat
-            alert(`Analyse terminée: ${data.title}\n\n${data.summary}`);
-            // En production, on afficherait un modal ou on rechargerait la section
+        if (data.success !== false) {
+            const title = data.title || data.question_id || 'Analyse';
+            const summary = data.summary || 'Analyse terminée';
+            const insights = data.insights || [];
+            
+            let message = `${title}\n\n${summary}`;
+            if (insights.length > 0) {
+                message += '\n\nRésultats:\n• ' + insights.slice(0, 5).join('\n• ');
+            }
+            alert(message);
             location.reload();
         } else {
-            alert(`Erreur: ${data.summary}`);
+            alert(`Erreur: ${data.error || data.summary || 'Erreur inconnue'}`);
+            btn.disabled = false;
+            btn.textContent = 'Analyser';
         }
     })
     .catch(error => {
         console.error('Erreur:', error);
         alert('Erreur lors de l\'analyse');
+        btn.disabled = false;
+        btn.textContent = 'Analyser';
     });
 }
 </script>
