@@ -1,0 +1,13 @@
+Hiérarchie des gains (du plus simple au plus radical)
+Niveau 1 : Remplacement direct de iterrows() (gain x100-300, effort minimal)
+Le consensus est unanime : iterrows() convertit chaque ligne en objet Series, ce qui génère un overhead massif Exxact Corp. Sur 1M de lignes, un simple iterrows() vide prend ~105 secondes contre ~1 seconde en itertuples() et quasi-instantané en vectorisé. La vectorisation pandas atteint un facteur x1500 par rapport à iterrows, et la vectorisation NumPy x1900 Medium.
+Pour ton analyse Crystal, la stratégie optimale c'est : remplacer la boucle iterrows par groupby().apply() ou mieux, par du groupby().agg() avec des fonctions vectorisées. Le calcul d'entropie Shannon par groupe (libellés, journaux) se vectorise très bien avec value_counts() + formule numpy.
+Niveau 2 : itertuples() si la boucle est inévitable (gain x10-13)
+itertuples est 13 fois plus rapide que iterrows car il retourne des namedtuples au lieu d'objets Series Packetcoders. C'est le remplacement le plus mécanique : tu changes juste la syntaxe d'accès (row.colonne au lieu de row['colonne']).
+Niveau 3 : Polars au lieu de Pandas (gain x5-9 sur groupby)
+Sur 10M de lignes, Polars est 8.57x plus rapide que Pandas sur les opérations groupby Medium. Polars exploite nativement le parallélisme multi-cœur en Rust, là où pandas reste fondamentalement single-threaded Polars. Mais ça implique de réécrire la logique Crystal en syntaxe Polars.
+Niveau 4 : Numba JIT pour les calculs custom (gain x170)
+Sur 10M de lignes, Numba atteint un speedup de ~170x par rapport à la méthode numpy la plus rapide Codearmo, en compilant les boucles Python en code machine natif. Pertinent si ton calcul d'entropie a des branches conditionnelles complexes qui résistent à la vectorisation pure.
+Ma recommandation pour ton cas
+Le Niveau 1 suffit largement. L'analyse Crystal fait essentiellement : pour chaque (compte, analytique, mois), compter les libellés distincts et calculer Shannon. Ça se réécrit en 15 lignes avec groupby + agg + numpy vectorisé, sans changer la logique métier. Tu passes de ~60 secondes à ~2-3 secondes sur 2M de lignes.
+Tu veux que je réécrive la fonction run_crystal_analysis en version vectorisée ?
